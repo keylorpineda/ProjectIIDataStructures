@@ -52,11 +52,13 @@ private:
     void initializeMapStorage();
     void loadPersistedMap();
     bool persistMapPixmap(const QPixmap &pixmap);
-    void applyMapPixmap(const QPixmap &pixmap, bool forceFit);
+    bool applyMapPixmap(const QPixmap &pixmap, bool forceFit);
     void clearStoredMap();
     void addMapItemToScene();
     bool mapIsActive() const;
     bool pointWithinMap(const QPointF &point) const;
     void promptAddStationAt(const QPointF &scenePos);
     void handleStationRemovalRequest(int stationId);
+    QPixmap prepareMapPixmap(const QPixmap &pixmap) const;
+    void updateRouteTimeSuggestion();
 };

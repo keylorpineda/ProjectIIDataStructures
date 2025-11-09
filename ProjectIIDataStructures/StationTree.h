@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Station.h"
+#include <functional>
 #include <vector>
 
 class StationTree
@@ -17,6 +18,7 @@ public:
     void clear();
     bool isEmpty() const;
     int size() const;
+    void forEach(const std::function<void(Station &)> &callback);
 private:
     struct Node
     {
@@ -35,4 +37,5 @@ private:
     void preOrder(Node *node, std::vector<Station> &result) const;
     void postOrder(Node *node, std::vector<Station> &result) const;
     void clear(Node *node);
+    void forEach(Node *node, const std::function<void(Station &)> &callback);
 };
