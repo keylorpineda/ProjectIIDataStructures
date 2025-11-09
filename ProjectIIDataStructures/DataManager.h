@@ -16,6 +16,7 @@ public:
     void saveReport(const QString &content) const;
     void appendReportLine(const QString &line) const;
     void saveTraversal(const QString &content) const;
+    QString getBasePath() const;
 private:
     QString basePath;
     QString stationsFile;
