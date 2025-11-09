@@ -32,10 +32,16 @@
     <QtMoc Include="ProjectIIDataStructures.h">
       <Filter>Header Files</Filter>
     </QtMoc>
+    <QtMoc Include="InteractiveGraphicsView.h">
+      <Filter>Header Files</Filter>
+    </QtMoc>
     <ClCompile Include="DataManager.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="GraphNetwork.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="InteractiveGraphicsView.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="ProjectIIDataStructures.cpp">
@@ -63,6 +69,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="GraphNetwork.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="InteractiveGraphicsView.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="Station.h">

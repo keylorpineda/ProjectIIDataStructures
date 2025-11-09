@@ -214,7 +214,7 @@
           </property>
           <layout class="QVBoxLayout" name="verticalLayout_5">
            <item>
-            <widget class="QGraphicsView" name="graphView">
+            <widget class="InteractiveGraphicsView" name="graphView">
              <property name="minimumSize">
               <size>
                <width>400</width>
@@ -229,7 +229,7 @@
            <item>
             <widget class="QLabel" name="graphHintLabel">
              <property name="text">
-              <string>Los nodos representan estaciones y las líneas muestran rutas con su tiempo estimado.</string>
+              <string>Usa la rueda del mouse o las teclas +/- y flechas para explorar el mapa. Los nodos representan estaciones y las líneas muestran rutas con su tiempo estimado.</string>
              </property>
              <property name="wordWrap">
               <bool>true</bool>
@@ -471,6 +471,13 @@
   <widget class="QMenuBar" name="menuBar"/>
   <widget class="QStatusBar" name="statusBar"/>
  </widget>
+ <customwidgets>
+  <customwidget>
+   <class>InteractiveGraphicsView</class>
+   <extends>QGraphicsView</extends>
+   <header>InteractiveGraphicsView.h</header>
+  </customwidget>
+ </customwidgets>
  <layoutdefault spacing="6" margin="11"/>
  <resources>
   <include location="ProjectIIDataStructures.qrc"/>

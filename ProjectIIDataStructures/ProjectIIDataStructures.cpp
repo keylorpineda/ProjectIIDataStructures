@@ -4,6 +4,7 @@
 #include <QComboBox>
 #include <QFont>
 #include <QGraphicsEllipseItem>
+#include <QGraphicsRectItem>
 #include <QGraphicsLineItem>
 #include <QGraphicsTextItem>
 #include <QGraphicsView>
@@ -12,6 +13,8 @@
 #include <QPointF>
 #include <QPainter>
 #include <QPen>
+#include <QRadialGradient>
+#include <QSizeF>
 #include <QStringList>
 #include <algorithm>
 #include <set>
@@ -23,11 +26,8 @@ ProjectIIDataStructures::ProjectIIDataStructures(QWidget *parent)
 {
     ui.setupUi(this);
     ui.graphView->setScene(graphScene);
-    ui.graphView->setRenderHint(QPainter::Antialiasing);
-    ui.graphView->setRenderHint(QPainter::TextAntialiasing);
-    ui.graphView->setDragMode(QGraphicsView::ScrollHandDrag);
-    ui.graphView->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
-    ui.graphView->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    ui.graphView->setAutoFitEnabled(true);
+    ui.graphView->setFocusPolicy(Qt::StrongFocus);
     ui.stationIdEdit->setValidator(stationIdValidator);
     manager.initialize();
     setupUiBehavior();
@@ -357,10 +357,9 @@ void ProjectIIDataStructures::refreshGraphVisualization()
     if (stations.empty())
     {
         graphScene->addText("No hay estaciones registradas.");
-        QRectF rect = graphScene->itemsBoundingRect().adjusted(-20.0, -20.0, 20.0, 20.0);
+        QRectF rect = graphScene->itemsBoundingRect().adjusted(-40.0, -40.0, 40.0, 40.0);
         graphScene->setSceneRect(rect);
-        ui.graphView->setSceneRect(rect);
-        ui.graphView->fitInView(rect, Qt::KeepAspectRatio);
+        ui.graphView->setContentRect(rect, true);
         return;
     }
 
@@ -376,33 +375,35 @@ void ProjectIIDataStructures::refreshGraphVisualization()
     }
 
     std::unordered_map<int, QPointF> positions;
-    const double sceneWidth = 640.0;
-    const double sceneHeight = 420.0;
-    const double centerX = sceneWidth / 2.0;
-    const double centerY = sceneHeight / 2.0;
-    const double minRadius = 80.0;
-    double radius = std::min(sceneWidth, sceneHeight) / 2.0 - 60.0;
-    if (radius < minRadius)
-    {
-        radius = minRadius;
-    }
-
-    const double nodeRadius = 22.0;
-    const QColor nodeFill(52, 152, 219);
-    const QColor nodeBorder(44, 62, 80);
-    const QColor edgeColor(41, 128, 185);
-    const QColor closedColor(192, 57, 43);
-
     const double pi = std::acos(-1.0);
     const double twoPi = 2.0 * pi;
-    const double halfPi = pi / 2.0;
+    const double baseRadius = 140.0;
+    const double growthFactor = 34.0;
+    double radius = baseRadius + growthFactor * std::log1p(static_cast<double>(stations.size()));
+    double sceneWidth = radius * 2.0 + 320.0;
+    double sceneHeight = radius * 2.0 + 260.0;
+    const double centerX = sceneWidth / 2.0;
+    const double centerY = sceneHeight / 2.0;
+
     for (size_t i = 0; i < stations.size(); ++i)
     {
-        double angle = (static_cast<double>(i) / static_cast<double>(stations.size())) * twoPi - halfPi;
-        double x = centerX + radius * std::cos(angle);
-        double y = centerY + radius * std::sin(angle);
+        double ratio = stations.size() == 1 ? 0.0 : static_cast<double>(i) / static_cast<double>(stations.size());
+        double angle = ratio * twoPi - pi / 2.0;
+        double radialMod = 0.85 + 0.18 * std::sin(angle * 3.0);
+        double x = centerX + radius * radialMod * std::cos(angle);
+        double y = centerY + radius * (0.9 + 0.12 * std::cos(angle * 2.0)) * std::sin(angle);
         positions[stations[i].getId()] = QPointF(x, y);
     }
+
+    const double nodeRadius = 24.0;
+    const QColor nodeFill(52, 152, 219);
+    const QColor nodeBorder(19, 33, 60);
+    const QColor edgeColor(41, 128, 185);
+    const QColor edgeLabelBg(255, 255, 255, 180);
+    const QColor closedColor(231, 76, 60);
+    const QColor closureLabelBg(231, 76, 60, 110);
+    const QFont edgeFont("Sans Serif", 9, QFont::DemiBold);
+    const QFont nodeFont("Sans Serif", 9, QFont::Bold);
 
     // Draw edges first so that nodes remain on top.
     for (const auto &edge : routes)
@@ -418,7 +419,7 @@ void ProjectIIDataStructures::refreshGraphVisualization()
         std::pair<int, int> normalizedPair = {std::min(edge.from, edge.to), std::max(edge.from, edge.to)};
         bool isClosed = closureSet.find(normalizedPair) != closureSet.end();
 
-        QPen pen(isClosed ? closedColor : edgeColor, isClosed ? 3.0 : 2.0);
+        QPen pen(isClosed ? closedColor : edgeColor, isClosed ? 3.8 : 2.6);
         if (isClosed)
         {
             pen.setStyle(Qt::DashLine);
@@ -433,7 +434,7 @@ void ProjectIIDataStructures::refreshGraphVisualization()
         QPointF offset(0.0, 0.0);
         if (length > 0.0)
         {
-            double offsetDistance = 14.0;
+            double offsetDistance = 18.0;
             offset = QPointF(-dy / length * offsetDistance, dx / length * offsetDistance);
         }
         QString weightText = QString::number(edge.weight, 'f', 1);
@@ -441,11 +442,16 @@ void ProjectIIDataStructures::refreshGraphVisualization()
         {
             weightText.append(" (cerrado)");
         }
-        auto *weightItem = graphScene->addText(weightText, QFont("Sans Serif", 9));
+        auto *weightItem = graphScene->addText(weightText, edgeFont);
         QRectF textRect = weightItem->boundingRect();
-        weightItem->setDefaultTextColor(isClosed ? closedColor : edgeColor.darker());
-        weightItem->setPos(mid + offset - QPointF(textRect.width() / 2.0, textRect.height() / 2.0));
-        weightItem->setZValue(1);
+        QPointF labelPos = mid + offset - QPointF(textRect.width() / 2.0, textRect.height() / 2.0);
+        QRectF bgRect(labelPos - QPointF(6.0, 4.0), textRect.size() + QSizeF(12.0, 8.0));
+        QColor backgroundColor = isClosed ? closureLabelBg : edgeLabelBg;
+        auto *labelBackground = graphScene->addRoundedRect(bgRect, 6.0, 6.0, QPen(Qt::NoPen), QBrush(backgroundColor));
+        labelBackground->setZValue(0.8);
+        weightItem->setDefaultTextColor(isClosed ? QColor(255, 255, 255) : QColor(45, 52, 54));
+        weightItem->setPos(labelPos);
+        weightItem->setZValue(1.2);
     }
 
     for (const auto &station : stations)
@@ -457,21 +463,30 @@ void ProjectIIDataStructures::refreshGraphVisualization()
         }
         QPointF point = positionIt->second;
         QRectF ellipseRect(point.x() - nodeRadius, point.y() - nodeRadius, nodeRadius * 2.0, nodeRadius * 2.0);
-        auto *node = graphScene->addEllipse(ellipseRect, QPen(nodeBorder, 2.0), QBrush(nodeFill));
-        node->setZValue(2);
+
+        QRectF haloRect = ellipseRect.adjusted(-10.0, -10.0, 10.0, 10.0);
+        auto *halo = graphScene->addEllipse(haloRect, Qt::NoPen, QBrush(QColor(255, 255, 255, 28)));
+        halo->setZValue(1.5);
+
+        QRadialGradient gradient(point, nodeRadius * 1.25, point);
+        gradient.setColorAt(0.0, nodeFill.lighter(125));
+        gradient.setColorAt(0.7, nodeFill);
+        gradient.setColorAt(1.0, nodeBorder.darker(180));
+
+        auto *node = graphScene->addEllipse(ellipseRect, QPen(nodeBorder, 2.4), QBrush(gradient));
+        node->setZValue(2.0);
 
         QString labelText = QString::number(station.getId()) + "\n" + station.getName();
-        auto *textItem = graphScene->addText(labelText, QFont("Sans Serif", 8));
+        auto *textItem = graphScene->addText(labelText, nodeFont);
         QRectF textRect = textItem->boundingRect();
         textItem->setDefaultTextColor(Qt::white);
         textItem->setPos(point.x() - textRect.width() / 2.0, point.y() - textRect.height() / 2.0);
-        textItem->setZValue(3);
+        textItem->setZValue(2.5);
     }
 
-    QRectF bounding = graphScene->itemsBoundingRect().adjusted(-40.0, -40.0, 40.0, 40.0);
+    QRectF bounding = graphScene->itemsBoundingRect().adjusted(-80.0, -80.0, 80.0, 80.0);
     graphScene->setSceneRect(bounding);
-    ui.graphView->setSceneRect(bounding);
-    ui.graphView->fitInView(bounding, Qt::KeepAspectRatio);
+    ui.graphView->setContentRect(bounding, !ui.graphView->hasUserAdjusted());
 }
 
 void ProjectIIDataStructures::displayMessage(const QString &text)

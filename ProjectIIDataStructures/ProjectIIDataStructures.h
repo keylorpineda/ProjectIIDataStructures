@@ -1,5 +1,6 @@
 #pragma once
 
+#include "InteractiveGraphicsView.h"
 #include "TransitManager.h"
 #include "ui_ProjectIIDataStructures.h"
 #include <QCloseEvent>
