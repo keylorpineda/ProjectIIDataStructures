@@ -3,6 +3,7 @@
 #include "TransitManager.h"
 #include "ui_ProjectIIDataStructures.h"
 #include <QCloseEvent>
+#include <QGraphicsScene>
 #include <QIntValidator>
 #include <QtWidgets/QMainWindow>
 #include <utility>
@@ -23,12 +24,14 @@ private:
     Ui::ProjectIIDataStructuresClass ui;
     TransitManager manager;
     QIntValidator *stationIdValidator;
+    QGraphicsScene *graphScene;
     void setupUiBehavior();
     void refreshStations();
     void refreshRoutes();
     void refreshClosures();
     void refreshCombos();
     void refreshAll();
+    void refreshGraphVisualization();
     void displayMessage(const QString &text);
     void displayError(const QString &text);
     int selectedStationId() const;

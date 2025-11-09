@@ -204,6 +204,38 @@
            <item row="1" column="0" colspan="2">
             <widget class="QListWidget" name="closuresList"/>
            </item>
+         </layout>
+        </widget>
+       </item>
+        <item>
+         <widget class="QGroupBox" name="graphGroup">
+          <property name="title">
+           <string>Mapa de rutas</string>
+          </property>
+          <layout class="QVBoxLayout" name="verticalLayout_5">
+           <item>
+            <widget class="QGraphicsView" name="graphView">
+             <property name="minimumSize">
+              <size>
+               <width>400</width>
+               <height>300</height>
+              </size>
+             </property>
+             <property name="renderHints">
+              <set>QPainter::Antialiasing|QPainter::SmoothPixmapTransform</set>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLabel" name="graphHintLabel">
+             <property name="text">
+              <string>Los nodos representan estaciones y las líneas muestran rutas con su tiempo estimado.</string>
+             </property>
+             <property name="wordWrap">
+              <bool>true</bool>
+             </property>
+            </widget>
+           </item>
           </layout>
          </widget>
         </item>
