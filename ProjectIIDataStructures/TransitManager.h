@@ -12,7 +12,7 @@ public:
     void saveData();
     bool addStation(int id, const QString &name, const std::optional<QPointF> &position = std::nullopt);
     bool removeStation(int id);
-    bool addRoute(int fromId, int toId, double time);
+    bool addRoute(int fromId, int toId, const std::optional<double> &time = std::nullopt);
     bool removeRoute(int fromId, int toId);
     std::vector<Station> getStations() const;
     std::vector<GraphEdge> getRoutes() const;
@@ -34,6 +34,8 @@ public:
     QString getStationName(int id) const;
     const StationTree &getTree() const;
     const GraphNetwork &getGraph() const;
+    std::optional<double> calculateRouteWeightFromCoordinates(int fromId, int toId) const;
+    void scaleStationPositions(double scaleX, double scaleY);
 private:
     StationTree tree;
     GraphNetwork graph;

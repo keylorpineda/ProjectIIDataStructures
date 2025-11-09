@@ -23,6 +23,8 @@
 #include <QPainterPath>
 #include <QPen>
 #include <QPixmap>
+#include <QSize>
+#include <QSignalBlocker>
 #include <QTransform>
 #include <optional>
 #include <QRadialGradient>
@@ -74,6 +76,10 @@ void ProjectIIDataStructures::setupUiBehavior()
 {
     ui.stationTable->horizontalHeader()->setSectionResizeMode(QHeaderView::Stretch);
     ui.routeTable->horizontalHeader()->setSectionResizeMode(QHeaderView::Stretch);
+    ui.routeTimeSpin->setDecimals(2);
+    ui.routeTimeSpin->setMinimum(0.10);
+    ui.routeTimeSpin->setSingleStep(0.50);
+    ui.routeTimeSpin->setToolTip(tr("Ingrese manualmente el tiempo estimado de la ruta en minutos."));
     connect(ui.zoomInButton, &QPushButton::clicked, ui.graphView, &InteractiveGraphicsView::zoomIn);
     connect(ui.zoomOutButton, &QPushButton::clicked, ui.graphView, &InteractiveGraphicsView::zoomOut);
     connect(ui.resetViewButton, &QPushButton::clicked, ui.graphView, &InteractiveGraphicsView::resetToFit);
@@ -116,6 +122,12 @@ void ProjectIIDataStructures::setupUiBehavior()
             displayError("No se pudo eliminar la estación.");
         }
     });
+    connect(ui.routeOriginCombo, static_cast<void (QComboBox::*)(int)>(&QComboBox::currentIndexChanged), this, [this](int /*index*/) {
+        updateRouteTimeSuggestion();
+    });
+    connect(ui.routeDestinationCombo, static_cast<void (QComboBox::*)(int)>(&QComboBox::currentIndexChanged), this, [this](int /*index*/) {
+        updateRouteTimeSuggestion();
+    });
     connect(ui.addRouteButton, &QPushButton::clicked, this, [this]() {
         auto selection = selectedRoute();
         if (selection.first <= 0 || selection.second <= 0)
@@ -123,12 +135,39 @@ void ProjectIIDataStructures::setupUiBehavior()
             displayError("Seleccione estaciones válidas para la ruta.");
             return;
         }
-        double time = ui.routeTimeSpin->value();
+        std::optional<double> computed = manager.calculateRouteWeightFromCoordinates(selection.first, selection.second);
+        std::optional<double> time = computed;
+        if (!time.has_value())
+        {
+            double manual = ui.routeTimeSpin->value();
+            if (manual <= 0.0)
+            {
+                displayError("Ingrese un tiempo válido mayor que cero.");
+                return;
+            }
+            time = manual;
+        }
         if (manager.addRoute(selection.first, selection.second, time))
         {
-            displayMessage("Ruta registrada exitosamente.");
+            if (computed.has_value())
+            {
+                QSignalBlocker blocker(ui.routeTimeSpin);
+                ui.routeTimeSpin->setValue(computed.value());
+            }
+            QString message;
+            if (computed.has_value())
+            {
+                message = QString("Ruta registrada exitosamente. Tiempo calculado: %1 minutos.")
+                              .arg(QString::number(computed.value(), 'f', 2));
+            }
+            else
+            {
+                message = "Ruta registrada exitosamente.";
+            }
+            displayMessage(message);
             refreshRoutes();
             refreshClosures();
+            updateRouteTimeSuggestion();
         }
         else
         {
@@ -186,13 +225,28 @@ void ProjectIIDataStructures::setupUiBehavior()
             displayError("No se pudo cargar la imagen seleccionada.");
             return;
         }
-        if (!persistMapPixmap(pixmap))
+        QSize originalSize = pixmap.size();
+        if (!applyMapPixmap(pixmap, true))
+        {
+            displayError("No se pudo preparar el mapa seleccionado.");
+            return;
+        }
+        if (!persistMapPixmap(loadedMapPixmap))
         {
             displayError("No se pudo guardar la imagen seleccionada como mapa.");
             return;
         }
-        applyMapPixmap(pixmap, true);
-        displayMessage("Mapa de fondo actualizado y almacenado.");
+        QSize scaledSize = loadedMapPixmap.size();
+        QString detail;
+        if (scaledSize != originalSize)
+        {
+            detail = QString(" (ajustado de %1×%2 px a %3×%4 px)")
+                         .arg(QString::number(originalSize.width()),
+                              QString::number(originalSize.height()),
+                              QString::number(scaledSize.width()),
+                              QString::number(scaledSize.height()));
+        }
+        displayMessage(QString("Mapa de fondo actualizado y almacenado%1.").arg(detail));
     });
     connect(ui.clearMapButton, &QPushButton::clicked, this, [this]() {
         if (!mapIsActive())
@@ -396,6 +450,7 @@ void ProjectIIDataStructures::refreshCombos()
     fillCombo(ui.traversalStartCombo, stations);
     fillCombo(ui.shortestStartCombo, stations);
     fillCombo(ui.shortestEndCombo, stations);
+    updateRouteTimeSuggestion();
 }
 
 void ProjectIIDataStructures::refreshAll()
@@ -764,8 +819,15 @@ void ProjectIIDataStructures::loadPersistedMap()
     {
         return;
     }
-    loadedMapPixmap = pixmap;
-    mapSceneRect = QRectF(QPointF(0.0, 0.0), QSizeF(pixmap.size()));
+    QSize originalSize = pixmap.size();
+    if (!applyMapPixmap(pixmap, false))
+    {
+        return;
+    }
+    if (loadedMapPixmap.size() != originalSize)
+    {
+        persistMapPixmap(loadedMapPixmap);
+    }
 }
 
 bool ProjectIIDataStructures::persistMapPixmap(const QPixmap &pixmap)
@@ -789,16 +851,66 @@ bool ProjectIIDataStructures::persistMapPixmap(const QPixmap &pixmap)
     return pixmap.save(mapStoredFile, "PNG");
 }
 
-void ProjectIIDataStructures::applyMapPixmap(const QPixmap &pixmap, bool forceFit)
+bool ProjectIIDataStructures::applyMapPixmap(const QPixmap &pixmap, bool forceFit)
 {
-    loadedMapPixmap = pixmap;
-    mapSceneRect = QRectF(QPointF(0.0, 0.0), QSizeF(pixmap.size()));
+    if (pixmap.isNull())
+    {
+        return false;
+    }
+    QSize originalSize = pixmap.size();
+    QPixmap processed = prepareMapPixmap(pixmap);
+    QSize processedSize = processed.size();
+    if (processedSize.isEmpty())
+    {
+        return false;
+    }
+    if (originalSize.width() > 0 && originalSize.height() > 0 && processedSize != originalSize)
+    {
+        double scaleX = static_cast<double>(processedSize.width()) / static_cast<double>(originalSize.width());
+        double scaleY = static_cast<double>(processedSize.height()) / static_cast<double>(originalSize.height());
+        manager.scaleStationPositions(scaleX, scaleY);
+    }
+    loadedMapPixmap = processed;
+    mapSceneRect = QRectF(QPointF(0.0, 0.0), QSizeF(processedSize));
     ui.graphView->clearBackgroundImage();
     refreshGraphVisualization();
-    if (forceFit)
+    ui.graphView->setContentRect(mapSceneRect, forceFit);
+    updateRouteTimeSuggestion();
+    return true;
+}
+
+QPixmap ProjectIIDataStructures::prepareMapPixmap(const QPixmap &pixmap) const
+{
+    if (!ui.graphView || pixmap.isNull())
     {
-        ui.graphView->setContentRect(mapSceneRect, true);
+        return pixmap;
     }
+    QSize viewportSize = ui.graphView->viewport()->size();
+    if (viewportSize.isEmpty())
+    {
+        return pixmap;
+    }
+    const double marginFactor = 0.92;
+    double maxWidth = std::max(200.0, viewportSize.width() * marginFactor);
+    double maxHeight = std::max(200.0, viewportSize.height() * marginFactor);
+    if (maxWidth <= 0.0 || maxHeight <= 0.0)
+    {
+        return pixmap;
+    }
+    double widthRatio = maxWidth / static_cast<double>(pixmap.width());
+    double heightRatio = maxHeight / static_cast<double>(pixmap.height());
+    double scaleFactor = std::min(widthRatio, heightRatio);
+    if (!std::isfinite(scaleFactor) || scaleFactor <= 0.0 || scaleFactor >= 1.0)
+    {
+        return pixmap;
+    }
+    int newWidth = static_cast<int>(std::round(pixmap.width() * scaleFactor));
+    int newHeight = static_cast<int>(std::round(pixmap.height() * scaleFactor));
+    if (newWidth <= 0 || newHeight <= 0)
+    {
+        return pixmap;
+    }
+    return pixmap.scaled(newWidth, newHeight, Qt::KeepAspectRatio, Qt::SmoothTransformation);
 }
 
 void ProjectIIDataStructures::clearStoredMap()
@@ -818,6 +930,7 @@ void ProjectIIDataStructures::clearStoredMap()
         delete mapPixmapItem;
         mapPixmapItem = nullptr;
     }
+    updateRouteTimeSuggestion();
 }
 
 void ProjectIIDataStructures::addMapItemToScene()
@@ -839,6 +952,30 @@ bool ProjectIIDataStructures::mapIsActive() const
 bool ProjectIIDataStructures::pointWithinMap(const QPointF &point) const
 {
     return mapIsActive() && !mapSceneRect.isNull() && mapSceneRect.contains(point);
+}
+
+void ProjectIIDataStructures::updateRouteTimeSuggestion()
+{
+    if (!ui.routeTimeSpin)
+    {
+        return;
+    }
+    int originId = ui.routeOriginCombo->currentData().toInt();
+    int destinationId = ui.routeDestinationCombo->currentData().toInt();
+    auto computed = manager.calculateRouteWeightFromCoordinates(originId, destinationId);
+    const QString autoTip = tr("Tiempo calculado automáticamente a partir de las coordenadas del mapa.");
+    if (computed.has_value() && computed.value() > 0.0)
+    {
+        QSignalBlocker blocker(ui.routeTimeSpin);
+        ui.routeTimeSpin->setValue(computed.value());
+        ui.routeTimeSpin->setEnabled(false);
+        ui.routeTimeSpin->setToolTip(autoTip);
+    }
+    else
+    {
+        ui.routeTimeSpin->setEnabled(true);
+        ui.routeTimeSpin->setToolTip(tr("Ingrese manualmente el tiempo estimado de la ruta en minutos."));
+    }
 }
 
 void ProjectIIDataStructures::promptAddStationAt(const QPointF &scenePos)
