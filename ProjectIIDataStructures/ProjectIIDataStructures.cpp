@@ -1,14 +1,33 @@
 #include "ProjectIIDataStructures.h"
+#include <QBrush>
+#include <QColor>
 #include <QComboBox>
+#include <QFont>
+#include <QGraphicsEllipseItem>
+#include <QGraphicsLineItem>
+#include <QGraphicsTextItem>
+#include <QGraphicsView>
 #include <QHeaderView>
 #include <QMessageBox>
+#include <QPointF>
+#include <QPainter>
+#include <QPen>
 #include <QStringList>
+#include <algorithm>
+#include <set>
+#include <unordered_map>
 #include <cmath>
 
 ProjectIIDataStructures::ProjectIIDataStructures(QWidget *parent)
-    : QMainWindow(parent), stationIdValidator(new QIntValidator(1, 999999, this))
+    : QMainWindow(parent), stationIdValidator(new QIntValidator(1, 999999, this)), graphScene(new QGraphicsScene(this))
 {
     ui.setupUi(this);
+    ui.graphView->setScene(graphScene);
+    ui.graphView->setRenderHint(QPainter::Antialiasing);
+    ui.graphView->setRenderHint(QPainter::TextAntialiasing);
+    ui.graphView->setDragMode(QGraphicsView::ScrollHandDrag);
+    ui.graphView->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    ui.graphView->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     ui.stationIdEdit->setValidator(stationIdValidator);
     manager.initialize();
     setupUiBehavior();
@@ -257,6 +276,7 @@ void ProjectIIDataStructures::refreshStations()
         ui.stationTable->setItem(row, 1, nameItem);
         row++;
     }
+    refreshGraphVisualization();
 }
 
 void ProjectIIDataStructures::refreshRoutes()
@@ -278,6 +298,7 @@ void ProjectIIDataStructures::refreshRoutes()
         ui.routeTable->setItem(row, 2, timeItem);
         row++;
     }
+    refreshGraphVisualization();
 }
 
 void ProjectIIDataStructures::refreshClosures()
@@ -295,6 +316,7 @@ void ProjectIIDataStructures::refreshClosures()
         QString text = QString("%1 ⇄ %2").arg(QString::number(closure.first), QString::number(closure.second));
         ui.closuresList->addItem(text);
     }
+    refreshGraphVisualization();
 }
 
 void ProjectIIDataStructures::refreshCombos()
@@ -321,6 +343,135 @@ void ProjectIIDataStructures::refreshAll()
     refreshRoutes();
     refreshClosures();
     refreshCombos();
+}
+
+void ProjectIIDataStructures::refreshGraphVisualization()
+{
+    if (!graphScene || !ui.graphView)
+    {
+        return;
+    }
+    graphScene->clear();
+
+    const auto stations = manager.getStations();
+    if (stations.empty())
+    {
+        graphScene->addText("No hay estaciones registradas.");
+        QRectF rect = graphScene->itemsBoundingRect().adjusted(-20.0, -20.0, 20.0, 20.0);
+        graphScene->setSceneRect(rect);
+        ui.graphView->setSceneRect(rect);
+        ui.graphView->fitInView(rect, Qt::KeepAspectRatio);
+        return;
+    }
+
+    const auto routes = manager.getRoutes();
+    const auto closures = manager.getClosures();
+
+    std::set<std::pair<int, int>> closureSet;
+    for (const auto &closure : closures)
+    {
+        int a = std::min(closure.first, closure.second);
+        int b = std::max(closure.first, closure.second);
+        closureSet.insert({a, b});
+    }
+
+    std::unordered_map<int, QPointF> positions;
+    const double sceneWidth = 640.0;
+    const double sceneHeight = 420.0;
+    const double centerX = sceneWidth / 2.0;
+    const double centerY = sceneHeight / 2.0;
+    const double minRadius = 80.0;
+    double radius = std::min(sceneWidth, sceneHeight) / 2.0 - 60.0;
+    if (radius < minRadius)
+    {
+        radius = minRadius;
+    }
+
+    const double nodeRadius = 22.0;
+    const QColor nodeFill(52, 152, 219);
+    const QColor nodeBorder(44, 62, 80);
+    const QColor edgeColor(41, 128, 185);
+    const QColor closedColor(192, 57, 43);
+
+    const double pi = std::acos(-1.0);
+    const double twoPi = 2.0 * pi;
+    const double halfPi = pi / 2.0;
+    for (size_t i = 0; i < stations.size(); ++i)
+    {
+        double angle = (static_cast<double>(i) / static_cast<double>(stations.size())) * twoPi - halfPi;
+        double x = centerX + radius * std::cos(angle);
+        double y = centerY + radius * std::sin(angle);
+        positions[stations[i].getId()] = QPointF(x, y);
+    }
+
+    // Draw edges first so that nodes remain on top.
+    for (const auto &edge : routes)
+    {
+        auto fromIt = positions.find(edge.from);
+        auto toIt = positions.find(edge.to);
+        if (fromIt == positions.end() || toIt == positions.end())
+        {
+            continue;
+        }
+        QPointF fromPoint = fromIt->second;
+        QPointF toPoint = toIt->second;
+        std::pair<int, int> normalizedPair = {std::min(edge.from, edge.to), std::max(edge.from, edge.to)};
+        bool isClosed = closureSet.find(normalizedPair) != closureSet.end();
+
+        QPen pen(isClosed ? closedColor : edgeColor, isClosed ? 3.0 : 2.0);
+        if (isClosed)
+        {
+            pen.setStyle(Qt::DashLine);
+        }
+        QGraphicsLineItem *line = graphScene->addLine(QLineF(fromPoint, toPoint), pen);
+        line->setZValue(0);
+
+        QPointF mid((fromPoint.x() + toPoint.x()) / 2.0, (fromPoint.y() + toPoint.y()) / 2.0);
+        double dx = toPoint.x() - fromPoint.x();
+        double dy = toPoint.y() - fromPoint.y();
+        double length = std::hypot(dx, dy);
+        QPointF offset(0.0, 0.0);
+        if (length > 0.0)
+        {
+            double offsetDistance = 14.0;
+            offset = QPointF(-dy / length * offsetDistance, dx / length * offsetDistance);
+        }
+        QString weightText = QString::number(edge.weight, 'f', 1);
+        if (isClosed)
+        {
+            weightText.append(" (cerrado)");
+        }
+        auto *weightItem = graphScene->addText(weightText, QFont("Sans Serif", 9));
+        QRectF textRect = weightItem->boundingRect();
+        weightItem->setDefaultTextColor(isClosed ? closedColor : edgeColor.darker());
+        weightItem->setPos(mid + offset - QPointF(textRect.width() / 2.0, textRect.height() / 2.0));
+        weightItem->setZValue(1);
+    }
+
+    for (const auto &station : stations)
+    {
+        auto positionIt = positions.find(station.getId());
+        if (positionIt == positions.end())
+        {
+            continue;
+        }
+        QPointF point = positionIt->second;
+        QRectF ellipseRect(point.x() - nodeRadius, point.y() - nodeRadius, nodeRadius * 2.0, nodeRadius * 2.0);
+        auto *node = graphScene->addEllipse(ellipseRect, QPen(nodeBorder, 2.0), QBrush(nodeFill));
+        node->setZValue(2);
+
+        QString labelText = QString::number(station.getId()) + "\n" + station.getName();
+        auto *textItem = graphScene->addText(labelText, QFont("Sans Serif", 8));
+        QRectF textRect = textItem->boundingRect();
+        textItem->setDefaultTextColor(Qt::white);
+        textItem->setPos(point.x() - textRect.width() / 2.0, point.y() - textRect.height() / 2.0);
+        textItem->setZValue(3);
+    }
+
+    QRectF bounding = graphScene->itemsBoundingRect().adjusted(-40.0, -40.0, 40.0, 40.0);
+    graphScene->setSceneRect(bounding);
+    ui.graphView->setSceneRect(bounding);
+    ui.graphView->fitInView(bounding, Qt::KeepAspectRatio);
 }
 
 void ProjectIIDataStructures::displayMessage(const QString &text)
