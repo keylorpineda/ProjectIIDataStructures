@@ -4,6 +4,8 @@
 #include <QColor>
 #include <QKeyEvent>
 #include <QLinearGradient>
+#include <QMouseEvent>
+#include <QResizeEvent>
 #include <QScrollBar>
 #include <QWheelEvent>
 
@@ -22,7 +24,7 @@ InteractiveGraphicsView::InteractiveGraphicsView(QWidget *parent)
     setFrameStyle(QFrame::NoFrame);
     setHorizontalScrollBarPolicy(Qt::ScrollBarAsNeeded);
     setVerticalScrollBarPolicy(Qt::ScrollBarAsNeeded);
-    applyBackground();
+    updateBackgroundBrush();
 }
 
 void InteractiveGraphicsView::setAutoFitEnabled(bool enabled)
@@ -42,6 +44,22 @@ bool InteractiveGraphicsView::autoFitEnabled() const
 bool InteractiveGraphicsView::hasUserAdjusted() const
 {
     return m_userAdjusted;
+}
+
+void InteractiveGraphicsView::setBackgroundImage(const QPixmap &pixmap)
+{
+    m_customBackground = pixmap;
+    updateBackgroundBrush();
+}
+
+void InteractiveGraphicsView::clearBackgroundImage()
+{
+    if (m_customBackground.isNull())
+    {
+        return;
+    }
+    m_customBackground = QPixmap();
+    updateBackgroundBrush();
 }
 
 void InteractiveGraphicsView::setContentRect(const QRectF &rect, bool forceFit)
@@ -71,6 +89,16 @@ void InteractiveGraphicsView::resetToFit()
     fitInView(target, Qt::KeepAspectRatio);
     m_currentScale = transform().m11();
     m_userAdjusted = false;
+}
+
+void InteractiveGraphicsView::zoomIn()
+{
+    zoomBy(1.15);
+}
+
+void InteractiveGraphicsView::zoomOut()
+{
+    zoomBy(1.0 / 1.15);
 }
 
 void InteractiveGraphicsView::wheelEvent(QWheelEvent *event)
@@ -130,10 +158,21 @@ void InteractiveGraphicsView::keyPressEvent(QKeyEvent *event)
 void InteractiveGraphicsView::resizeEvent(QResizeEvent *event)
 {
     QGraphicsView::resizeEvent(event);
+    updateBackgroundBrush();
     if (m_autoFitEnabled && !m_userAdjusted && !m_lastContentRect.isNull())
     {
         resetToFit();
     }
+}
+
+void InteractiveGraphicsView::mouseDoubleClickEvent(QMouseEvent *event)
+{
+    if (event->button() == Qt::LeftButton)
+    {
+        QPointF scenePoint = mapToScene(event->pos());
+        emit scenePointActivated(scenePoint);
+    }
+    QGraphicsView::mouseDoubleClickEvent(event);
 }
 
 void InteractiveGraphicsView::zoomBy(qreal factor)
@@ -165,8 +204,23 @@ void InteractiveGraphicsView::panByPixels(int dx, int dy)
     m_userAdjusted = true;
 }
 
-void InteractiveGraphicsView::applyBackground()
+void InteractiveGraphicsView::updateBackgroundBrush()
 {
+    if (!m_customBackground.isNull())
+    {
+        QSize viewSize = viewport() ? viewport()->size() : QSize();
+        if (!viewSize.isEmpty())
+        {
+            QPixmap scaled = m_customBackground.scaled(viewSize, Qt::KeepAspectRatioByExpanding, Qt::SmoothTransformation);
+            setBackgroundBrush(QBrush(scaled));
+        }
+        else
+        {
+            setBackgroundBrush(QBrush(m_customBackground));
+        }
+        return;
+    }
+
     QLinearGradient gradient(0.0, 0.0, 0.0, 1.0);
     gradient.setCoordinateMode(QGradient::ObjectBoundingMode);
     gradient.setColorAt(0.0, QColor(30, 39, 46));

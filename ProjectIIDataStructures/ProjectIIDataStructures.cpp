@@ -2,18 +2,27 @@
 #include <QBrush>
 #include <QColor>
 #include <QComboBox>
+#include <QCoreApplication>
+#include <QDir>
+#include <QFile>
+#include <QFileDialog>
 #include <QFont>
 #include <QGraphicsEllipseItem>
 #include <QGraphicsRectItem>
 #include <QGraphicsLineItem>
+#include <QGraphicsPixmapItem>
 #include <QGraphicsTextItem>
 #include <QGraphicsView>
 #include <QHeaderView>
+#include <QInputDialog>
+#include <QLineEdit>
 #include <QMessageBox>
 #include <QPointF>
 #include <QPainter>
 #include <QPainterPath>
 #include <QPen>
+#include <QPixmap>
+#include <optional>
 #include <QRadialGradient>
 #include <QSizeF>
 #include <QStringList>
@@ -23,15 +32,20 @@
 #include <cmath>
 
 ProjectIIDataStructures::ProjectIIDataStructures(QWidget *parent)
-    : QMainWindow(parent), stationIdValidator(new QIntValidator(1, 999999, this)), graphScene(new QGraphicsScene(this))
+    : QMainWindow(parent),
+      stationIdValidator(new QIntValidator(1, 999999, this)),
+      graphScene(new QGraphicsScene(this)),
+      mapPixmapItem(nullptr)
 {
     ui.setupUi(this);
     ui.graphView->setScene(graphScene);
     ui.graphView->setAutoFitEnabled(true);
     ui.graphView->setFocusPolicy(Qt::StrongFocus);
     ui.stationIdEdit->setValidator(stationIdValidator);
+    initializeMapStorage();
     manager.initialize();
     setupUiBehavior();
+    loadPersistedMap();
     refreshAll();
     displayMessage("Bienvenido al gestor de transporte La Mancha.");
 }
@@ -50,6 +64,10 @@ void ProjectIIDataStructures::setupUiBehavior()
 {
     ui.stationTable->horizontalHeader()->setSectionResizeMode(QHeaderView::Stretch);
     ui.routeTable->horizontalHeader()->setSectionResizeMode(QHeaderView::Stretch);
+    connect(ui.zoomInButton, &QPushButton::clicked, ui.graphView, &InteractiveGraphicsView::zoomIn);
+    connect(ui.zoomOutButton, &QPushButton::clicked, ui.graphView, &InteractiveGraphicsView::zoomOut);
+    connect(ui.resetViewButton, &QPushButton::clicked, ui.graphView, &InteractiveGraphicsView::resetToFit);
+    connect(ui.graphView, &InteractiveGraphicsView::scenePointActivated, this, &ProjectIIDataStructures::promptAddStationAt);
     connect(ui.addStationButton, &QPushButton::clicked, this, [this]() {
         bool ok = false;
         int id = ui.stationIdEdit->text().toInt(&ok);
@@ -144,6 +162,38 @@ void ProjectIIDataStructures::setupUiBehavior()
         manager.reloadClosures();
         refreshClosures();
         displayMessage("Cierres de vía actualizados.");
+    });
+    connect(ui.loadMapButton, &QPushButton::clicked, this, [this]() {
+        QString filter = "Imágenes (*.png *.jpg *.jpeg *.bmp *.gif *.webp)";
+        QString filePath = QFileDialog::getOpenFileName(this, tr("Seleccionar mapa"), QString(), filter);
+        if (filePath.isEmpty())
+        {
+            return;
+        }
+        QPixmap pixmap(filePath);
+        if (pixmap.isNull())
+        {
+            displayError("No se pudo cargar la imagen seleccionada.");
+            return;
+        }
+        if (!persistMapPixmap(pixmap))
+        {
+            displayError("No se pudo guardar la imagen seleccionada como mapa.");
+            return;
+        }
+        applyMapPixmap(pixmap, true);
+        displayMessage("Mapa de fondo actualizado y almacenado.");
+    });
+    connect(ui.clearMapButton, &QPushButton::clicked, this, [this]() {
+        if (!mapIsActive())
+        {
+            displayMessage("No hay un mapa guardado para eliminar.");
+            return;
+        }
+        clearStoredMap();
+        ui.graphView->clearBackgroundImage();
+        refreshGraphVisualization();
+        displayMessage("Se eliminó el mapa guardado y se restauró el fondo predeterminado.");
     });
     connect(ui.runTraversalButton, &QPushButton::clicked, this, [this]() {
         int startId = ui.traversalStartCombo->currentData().toInt();
@@ -352,13 +402,34 @@ void ProjectIIDataStructures::refreshGraphVisualization()
     {
         return;
     }
+    bool hasMap = mapIsActive();
     graphScene->clear();
+    mapPixmapItem = nullptr;
+    if (hasMap)
+    {
+        addMapItemToScene();
+    }
 
     const auto stations = manager.getStations();
     if (stations.empty())
     {
-        graphScene->addText("No hay estaciones registradas.");
-        QRectF rect = graphScene->itemsBoundingRect().adjusted(-40.0, -40.0, 40.0, 40.0);
+        if (!hasMap)
+        {
+            graphScene->addText("No hay estaciones registradas.");
+        }
+        QRectF rect;
+        if (hasMap && !mapSceneRect.isNull())
+        {
+            rect = mapSceneRect;
+        }
+        else
+        {
+            rect = graphScene->itemsBoundingRect().adjusted(-40.0, -40.0, 40.0, 40.0);
+            if (rect.isNull())
+            {
+                rect = QRectF(-200.0, -150.0, 400.0, 300.0);
+            }
+        }
         graphScene->setSceneRect(rect);
         ui.graphView->setContentRect(rect, true);
         return;
@@ -375,25 +446,42 @@ void ProjectIIDataStructures::refreshGraphVisualization()
         closureSet.insert({a, b});
     }
 
+    std::unordered_map<int, QPointF> fallbackPositions;
     std::unordered_map<int, QPointF> positions;
     const double pi = std::acos(-1.0);
     const double twoPi = 2.0 * pi;
     const double baseRadius = 140.0;
     const double growthFactor = 34.0;
     double radius = baseRadius + growthFactor * std::log1p(static_cast<double>(stations.size()));
-    double sceneWidth = radius * 2.0 + 320.0;
-    double sceneHeight = radius * 2.0 + 260.0;
-    const double centerX = sceneWidth / 2.0;
-    const double centerY = sceneHeight / 2.0;
+    if (hasMap && !mapSceneRect.isNull())
+    {
+        double maxRadius = 0.45 * std::min(mapSceneRect.width(), mapSceneRect.height());
+        radius = std::min(radius, maxRadius);
+    }
+    double sceneWidth = hasMap && !mapSceneRect.isNull() ? mapSceneRect.width() : radius * 2.0 + 320.0;
+    double sceneHeight = hasMap && !mapSceneRect.isNull() ? mapSceneRect.height() : radius * 2.0 + 260.0;
+    QPointF layoutCenter = hasMap && !mapSceneRect.isNull() ? mapSceneRect.center() : QPointF(sceneWidth / 2.0, sceneHeight / 2.0);
 
     for (size_t i = 0; i < stations.size(); ++i)
     {
         double ratio = stations.size() == 1 ? 0.0 : static_cast<double>(i) / static_cast<double>(stations.size());
         double angle = ratio * twoPi - pi / 2.0;
         double radialMod = 0.85 + 0.18 * std::sin(angle * 3.0);
-        double x = centerX + radius * radialMod * std::cos(angle);
-        double y = centerY + radius * (0.9 + 0.12 * std::cos(angle * 2.0)) * std::sin(angle);
-        positions[stations[i].getId()] = QPointF(x, y);
+        double x = layoutCenter.x() + radius * radialMod * std::cos(angle);
+        double y = layoutCenter.y() + radius * (0.9 + 0.12 * std::cos(angle * 2.0)) * std::sin(angle);
+        fallbackPositions[stations[i].getId()] = QPointF(x, y);
+    }
+
+    for (const auto &station : stations)
+    {
+        if (hasMap && station.hasCoordinates())
+        {
+            positions[station.getId()] = station.getPosition();
+        }
+        else
+        {
+            positions[station.getId()] = fallbackPositions[station.getId()];
+        }
     }
 
     const double nodeRadius = 24.0;
@@ -487,7 +575,16 @@ void ProjectIIDataStructures::refreshGraphVisualization()
         textItem->setZValue(2.5);
     }
 
-    QRectF bounding = graphScene->itemsBoundingRect().adjusted(-80.0, -80.0, 80.0, 80.0);
+    QRectF bounding = graphScene->itemsBoundingRect();
+    if (hasMap)
+    {
+        bounding = bounding.united(mapSceneRect);
+        bounding = bounding.adjusted(-10.0, -10.0, 10.0, 10.0);
+    }
+    else
+    {
+        bounding = bounding.adjusted(-80.0, -80.0, 80.0, 80.0);
+    }
     graphScene->setSceneRect(bounding);
     ui.graphView->setContentRect(bounding, !ui.graphView->hasUserAdjusted());
 }
@@ -545,4 +642,156 @@ QString ProjectIIDataStructures::joinStations(const std::vector<int> &ids) const
         }
     }
     return parts.join(" → ");
+}
+
+void ProjectIIDataStructures::initializeMapStorage()
+{
+    QString baseDir = manager.dataDirectory();
+    if (baseDir.isEmpty())
+    {
+        baseDir = QCoreApplication::applicationDirPath();
+    }
+    QDir base(baseDir);
+    if (!base.exists())
+    {
+        base.mkpath(".");
+    }
+    mapStorageDirectory = base.filePath("mapas");
+    QDir storage(mapStorageDirectory);
+    if (!storage.exists())
+    {
+        storage.mkpath(".");
+    }
+    mapStoredFile = storage.filePath("mapa_fondo.png");
+}
+
+void ProjectIIDataStructures::loadPersistedMap()
+{
+    if (mapStoredFile.isEmpty())
+    {
+        return;
+    }
+    if (!QFile::exists(mapStoredFile))
+    {
+        return;
+    }
+    QPixmap pixmap(mapStoredFile);
+    if (pixmap.isNull())
+    {
+        return;
+    }
+    loadedMapPixmap = pixmap;
+    mapSceneRect = QRectF(QPointF(0.0, 0.0), QSizeF(pixmap.size()));
+}
+
+bool ProjectIIDataStructures::persistMapPixmap(const QPixmap &pixmap)
+{
+    if (mapStoredFile.isEmpty())
+    {
+        return false;
+    }
+    QDir storage(mapStorageDirectory);
+    if (!storage.exists())
+    {
+        if (!storage.mkpath("."))
+        {
+            return false;
+        }
+    }
+    if (QFile::exists(mapStoredFile) && !QFile::remove(mapStoredFile))
+    {
+        return false;
+    }
+    return pixmap.save(mapStoredFile, "PNG");
+}
+
+void ProjectIIDataStructures::applyMapPixmap(const QPixmap &pixmap, bool forceFit)
+{
+    loadedMapPixmap = pixmap;
+    mapSceneRect = QRectF(QPointF(0.0, 0.0), QSizeF(pixmap.size()));
+    ui.graphView->clearBackgroundImage();
+    refreshGraphVisualization();
+    if (forceFit)
+    {
+        ui.graphView->resetToFit();
+    }
+}
+
+void ProjectIIDataStructures::clearStoredMap()
+{
+    if (!mapStoredFile.isEmpty() && QFile::exists(mapStoredFile))
+    {
+        QFile::remove(mapStoredFile);
+    }
+    loadedMapPixmap = QPixmap();
+    mapSceneRect = QRectF();
+    if (mapPixmapItem)
+    {
+        if (graphScene)
+        {
+            graphScene->removeItem(mapPixmapItem);
+        }
+        delete mapPixmapItem;
+        mapPixmapItem = nullptr;
+    }
+}
+
+void ProjectIIDataStructures::addMapItemToScene()
+{
+    if (!graphScene || loadedMapPixmap.isNull())
+    {
+        return;
+    }
+    mapPixmapItem = graphScene->addPixmap(loadedMapPixmap);
+    mapPixmapItem->setZValue(-1000.0);
+    mapPixmapItem->setPos(0.0, 0.0);
+}
+
+bool ProjectIIDataStructures::mapIsActive() const
+{
+    return !loadedMapPixmap.isNull();
+}
+
+bool ProjectIIDataStructures::pointWithinMap(const QPointF &point) const
+{
+    return mapIsActive() && !mapSceneRect.isNull() && mapSceneRect.contains(point);
+}
+
+void ProjectIIDataStructures::promptAddStationAt(const QPointF &scenePos)
+{
+    if (!mapIsActive())
+    {
+        return;
+    }
+    if (!pointWithinMap(scenePos))
+    {
+        displayError("Seleccione un punto dentro del mapa para registrar la parada.");
+        return;
+    }
+
+    bool ok = false;
+    int id = QInputDialog::getInt(this, tr("Nueva estación"), tr("Código de estación:"), 1, 1, 999999, 1, &ok);
+    if (!ok)
+    {
+        return;
+    }
+    QString name = QInputDialog::getText(this, tr("Nueva estación"), tr("Nombre de la estación:"), QLineEdit::Normal, QString(), &ok).trimmed();
+    if (!ok)
+    {
+        return;
+    }
+    if (name.isEmpty())
+    {
+        displayError("El nombre de la estación no puede estar vacío.");
+        return;
+    }
+    if (manager.addStation(id, name, std::optional<QPointF>(scenePos)))
+    {
+        displayMessage("Estación agregada correctamente en el mapa.");
+        refreshAll();
+    }
+    else
+    {
+        displayError("No se pudo registrar la estación. Verifique que el código no exista.");
+    }
 }

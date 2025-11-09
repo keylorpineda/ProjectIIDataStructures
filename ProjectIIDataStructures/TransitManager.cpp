@@ -19,7 +19,12 @@ void TransitManager::saveData()
     dataManager.save(tree, graph);
 }
 
-bool TransitManager::addStation(int id, const QString &name)
+QString TransitManager::dataDirectory() const
+{
+    return dataManager.getBasePath();
+}
+
+bool TransitManager::addStation(int id, const QString &name, const std::optional<QPointF> &position)
 {
     QString trimmedName = name.trimmed();
     if (trimmedName.isEmpty())
@@ -27,6 +32,10 @@ bool TransitManager::addStation(int id, const QString &name)
         return false;
     }
     Station station(id, trimmedName);
+    if (position.has_value())
+    {
+        station.setPosition(position.value());
+    }
     if (!tree.insert(station))
     {
         return false;

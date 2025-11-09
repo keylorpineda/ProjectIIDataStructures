@@ -1,6 +1,7 @@
 #include "DataManager.h"
 #include <QDir>
 #include <QFile>
+#include <QPointF>
 #include <QTextStream>
 
 DataManager::DataManager()
@@ -48,6 +49,17 @@ void DataManager::load(StationTree &tree, GraphNetwork &graph) const
             }
             QString name = parts[1];
             Station station(id, name);
+            if (parts.size() >= 4)
+            {
+                bool okX = false;
+                bool okY = false;
+                double x = parts[2].toDouble(&okX);
+                double y = parts[3].toDouble(&okY);
+                if (okX && okY)
+                {
+                    station.setPosition(QPointF(x, y));
+                }
+            }
             tree.insert(station);
             graph.addStation(station);
         }
@@ -103,7 +115,13 @@ void DataManager::save(const StationTree &tree, const GraphNetwork &graph) const
         auto stations = tree.inOrder();
         for (const auto &station : stations)
         {
-            stream << station.getId() << ";" << station.getName() << "\n";
+            stream << station.getId() << ";" << station.getName();
+            if (station.hasCoordinates())
+            {
+                QPointF pos = station.getPosition();
+                stream << ";" << QString::number(pos.x(), 'f', 4) << ";" << QString::number(pos.y(), 'f', 4);
+            }
+            stream << "\n";
         }
         stationData.close();
     }
@@ -185,6 +203,11 @@ void DataManager::saveTraversal(const QString &content) const
         stream << content;
         traversalData.close();
     }
+}
+
+QString DataManager::getBasePath() const
+{
+    return basePath;
 }
 
 void DataManager::ensureFiles() const
