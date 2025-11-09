@@ -9,26 +9,35 @@
 #include <QFont>
 #include <QGraphicsEllipseItem>
 #include <QGraphicsRectItem>
-#include <QGraphicsLineItem>
 #include <QGraphicsPixmapItem>
+#include <QGraphicsPathItem>
 #include <QGraphicsTextItem>
 #include <QGraphicsView>
 #include <QHeaderView>
 #include <QInputDialog>
 #include <QLineEdit>
 #include <QMessageBox>
+#include <QGraphicsSceneMouseEvent>
 #include <QPointF>
 #include <QPainter>
 #include <QPen>
 #include <QPixmap>
+#include <QTransform>
 #include <optional>
 #include <QRadialGradient>
 #include <QSizeF>
 #include <QStringList>
+#include <QtMath>
 #include <algorithm>
 #include <set>
 #include <unordered_map>
 #include <cmath>
+#include <vector>
+
+namespace
+{
+constexpr int kStationItemRole = 1;
+}
 
 ProjectIIDataStructures::ProjectIIDataStructures(QWidget *parent)
     : QMainWindow(parent),
@@ -38,6 +47,7 @@ ProjectIIDataStructures::ProjectIIDataStructures(QWidget *parent)
 {
     ui.setupUi(this);
     ui.graphView->setScene(graphScene);
+    graphScene->installEventFilter(this);
     ui.graphView->setAutoFitEnabled(true);
     ui.graphView->setFocusPolicy(Qt::StrongFocus);
     ui.stationIdEdit->setValidator(stationIdValidator);
@@ -512,18 +522,85 @@ void ProjectIIDataStructures::refreshGraphVisualization()
         {
             pen.setStyle(Qt::DashLine);
         }
-        QGraphicsLineItem *line = graphScene->addLine(QLineF(fromPoint, toPoint), pen);
-        line->setZValue(0);
+        std::vector<QPointF> pathPoints;
+        pathPoints.push_back(fromPoint);
 
-        QPointF mid((fromPoint.x() + toPoint.x()) / 2.0, (fromPoint.y() + toPoint.y()) / 2.0);
-        double dx = toPoint.x() - fromPoint.x();
-        double dy = toPoint.y() - fromPoint.y();
-        double length = std::hypot(dx, dy);
+        if (hasMap && mapSceneRect.contains(fromPoint) && mapSceneRect.contains(toPoint))
+        {
+            QPointF corner1(fromPoint.x(), toPoint.y());
+            QPointF corner2(toPoint.x(), fromPoint.y());
+            bool corner1Valid = mapSceneRect.contains(corner1);
+            bool corner2Valid = mapSceneRect.contains(corner2);
+            if (corner1Valid || corner2Valid)
+            {
+                QPointF chosenCorner;
+                if (corner1Valid && corner2Valid)
+                {
+                    double length1 = QLineF(fromPoint, corner1).length() + QLineF(corner1, toPoint).length();
+                    double length2 = QLineF(fromPoint, corner2).length() + QLineF(corner2, toPoint).length();
+                    chosenCorner = length1 <= length2 ? corner1 : corner2;
+                }
+                else
+                {
+                    chosenCorner = corner1Valid ? corner1 : corner2;
+                }
+                pathPoints.push_back(chosenCorner);
+            }
+        }
+
+        pathPoints.push_back(toPoint);
+
+        QPainterPath path(pathPoints.front());
+        for (size_t i = 1; i < pathPoints.size(); ++i)
+        {
+            path.lineTo(pathPoints[i]);
+        }
+
+        auto *pathItem = graphScene->addPath(path, pen);
+        pathItem->setZValue(0);
+
+        std::vector<double> segmentLengths;
+        segmentLengths.reserve(pathPoints.size() - 1);
+        double totalLength = 0.0;
+        for (size_t i = 1; i < pathPoints.size(); ++i)
+        {
+            double len = QLineF(pathPoints[i - 1], pathPoints[i]).length();
+            segmentLengths.push_back(len);
+            totalLength += len;
+        }
+
+        QPointF mid = fromPoint;
+        QPointF direction(1.0, 0.0);
+        if (totalLength > 0.0)
+        {
+            double half = totalLength / 2.0;
+            double accumulated = 0.0;
+            for (size_t i = 0; i < segmentLengths.size(); ++i)
+            {
+                double len = segmentLengths[i];
+                if (accumulated + len >= half)
+                {
+                    double ratio = (half - accumulated) / len;
+                    QPointF startPoint = pathPoints[i];
+                    QPointF endPoint = pathPoints[i + 1];
+                    mid = startPoint + (endPoint - startPoint) * ratio;
+                    direction = endPoint - startPoint;
+                    break;
+                }
+                accumulated += len;
+            }
+        }
+        if (qFuzzyIsNull(direction.x()) && qFuzzyIsNull(direction.y()))
+        {
+            direction = toPoint - fromPoint;
+        }
+        double length = std::hypot(direction.x(), direction.y());
         QPointF offset(0.0, 0.0);
         if (length > 0.0)
         {
+            QPointF normal(-direction.y() / length, direction.x() / length);
             double offsetDistance = 18.0;
-            offset = QPointF(-dy / length * offsetDistance, dx / length * offsetDistance);
+            offset = normal * offsetDistance;
         }
         QString weightText = QString::number(edge.weight, 'f', 1);
         if (isClosed)
@@ -555,6 +632,8 @@ void ProjectIIDataStructures::refreshGraphVisualization()
         QRectF haloRect = ellipseRect.adjusted(-10.0, -10.0, 10.0, 10.0);
         auto *halo = graphScene->addEllipse(haloRect, Qt::NoPen, QBrush(QColor(255, 255, 255, 28)));
         halo->setZValue(1.5);
+        halo->setData(kStationItemRole, station.getId());
+        halo->setAcceptedMouseButtons(Qt::LeftButton | Qt::RightButton);
 
         QRadialGradient gradient(point, nodeRadius * 1.25, point);
         gradient.setColorAt(0.0, nodeFill.lighter(125));
@@ -563,6 +642,9 @@ void ProjectIIDataStructures::refreshGraphVisualization()
 
         auto *node = graphScene->addEllipse(ellipseRect, QPen(nodeBorder, 2.4), QBrush(gradient));
         node->setZValue(2.0);
+        node->setData(kStationItemRole, station.getId());
+        node->setAcceptedMouseButtons(Qt::LeftButton | Qt::RightButton);
+        node->setCursor(Qt::PointingHandCursor);
 
         QString labelText = QString::number(station.getId()) + "\n" + station.getName();
         auto *textItem = graphScene->addText(labelText, nodeFont);
@@ -570,6 +652,8 @@ void ProjectIIDataStructures::refreshGraphVisualization()
         textItem->setDefaultTextColor(Qt::white);
         textItem->setPos(point.x() - textRect.width() / 2.0, point.y() - textRect.height() / 2.0);
         textItem->setZValue(2.5);
+        textItem->setData(kStationItemRole, station.getId());
+        textItem->setAcceptedMouseButtons(Qt::LeftButton | Qt::RightButton);
     }
 
     QRectF bounding = graphScene->itemsBoundingRect();
@@ -710,7 +794,7 @@ void ProjectIIDataStructures::applyMapPixmap(const QPixmap &pixmap, bool forceFi
     refreshGraphVisualization();
     if (forceFit)
     {
-        ui.graphView->resetToFit();
+        ui.graphView->setContentRect(mapSceneRect, true);
     }
 }
 
@@ -790,5 +874,73 @@ void ProjectIIDataStructures::promptAddStationAt(const QPointF &scenePos)
     else
     {
         displayError("No se pudo registrar la estación. Verifique que el código no exista.");
+    }
+}
+
+bool ProjectIIDataStructures::eventFilter(QObject *watched, QEvent *event)
+{
+    if (watched == graphScene)
+    {
+        if (event->type() == QEvent::GraphicsSceneMousePress)
+        {
+            auto *mouseEvent = static_cast<QGraphicsSceneMouseEvent *>(event);
+            if (mouseEvent->button() == Qt::RightButton)
+            {
+                QGraphicsItem *item = graphScene->itemAt(mouseEvent->scenePos(), QTransform());
+                if (item)
+                {
+                    QVariant data = item->data(kStationItemRole);
+                    if (data.isValid())
+                    {
+                        handleStationRemovalRequest(data.toInt());
+                        return true;
+                    }
+                }
+            }
+        }
+        else if (event->type() == QEvent::GraphicsSceneMouseDoubleClick)
+        {
+            auto *mouseEvent = static_cast<QGraphicsSceneMouseEvent *>(event);
+            if (mouseEvent->button() == Qt::LeftButton)
+            {
+                QGraphicsItem *item = graphScene->itemAt(mouseEvent->scenePos(), QTransform());
+                if (item)
+                {
+                    QVariant data = item->data(kStationItemRole);
+                    if (data.isValid())
+                    {
+                        handleStationRemovalRequest(data.toInt());
+                        return true;
+                    }
+                }
+            }
+        }
+    }
+    return QMainWindow::eventFilter(watched, event);
+}
+
+void ProjectIIDataStructures::handleStationRemovalRequest(int stationId)
+{
+    if (stationId <= 0)
+    {
+        return;
+    }
+    QString stationName = manager.getStationName(stationId);
+    QString prompt = stationName.isEmpty()
+                          ? QString("¿Desea eliminar la estación %1?").arg(stationId)
+                          : QString("¿Desea eliminar la estación %1 - %2?").arg(stationId).arg(stationName);
+    auto response = QMessageBox::question(this, tr("Eliminar estación"), prompt, QMessageBox::Yes | QMessageBox::No, QMessageBox::No);
+    if (response != QMessageBox::Yes)
+    {
+        return;
+    }
+    if (manager.removeStation(stationId))
+    {
+        displayMessage(QString("Estación %1 eliminada correctamente.").arg(stationId));
+        refreshAll();
+    }
+    else
+    {
+        displayError("No se pudo eliminar la estación seleccionada.");
     }
 }
