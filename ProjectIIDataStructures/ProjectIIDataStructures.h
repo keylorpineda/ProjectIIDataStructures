@@ -1,7 +1,12 @@
 #pragma once
 
-#include <QtWidgets/QMainWindow>
+#include "TransitManager.h"
 #include "ui_ProjectIIDataStructures.h"
+#include <QCloseEvent>
+#include <QIntValidator>
+#include <QtWidgets/QMainWindow>
+#include <utility>
+#include <vector>
 
 class ProjectIIDataStructures : public QMainWindow
 {
@@ -11,7 +16,22 @@ public:
     ProjectIIDataStructures(QWidget *parent = nullptr);
     ~ProjectIIDataStructures();
 
+protected:
+    void closeEvent(QCloseEvent *event) override;
+
 private:
     Ui::ProjectIIDataStructuresClass ui;
+    TransitManager manager;
+    QIntValidator *stationIdValidator;
+    void setupUiBehavior();
+    void refreshStations();
+    void refreshRoutes();
+    void refreshClosures();
+    void refreshCombos();
+    void refreshAll();
+    void displayMessage(const QString &text);
+    void displayError(const QString &text);
+    int selectedStationId() const;
+    std::pair<int, int> selectedRoute() const;
+    QString joinStations(const std::vector<int> &ids) const;
 };
-

@@ -99,9 +99,20 @@
     <QtRcc Include="ProjectIIDataStructures.qrc"/>
     <QtUic Include="ProjectIIDataStructures.ui"/>
     <QtMoc Include="ProjectIIDataStructures.h"/>
+    <ClCompile Include="DataManager.cpp"/>
+    <ClCompile Include="GraphNetwork.cpp"/>
     <ClCompile Include="ProjectIIDataStructures.cpp"/>
+    <ClCompile Include="Station.cpp"/>
+    <ClCompile Include="StationTree.cpp"/>
+    <ClCompile Include="TransitManager.cpp"/>
     <ClCompile Include="main.cpp"/>
-
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="DataManager.h"/>
+    <ClInclude Include="GraphNetwork.h"/>
+    <ClInclude Include="Station.h"/>
+    <ClInclude Include="StationTree.h"/>
+    <ClInclude Include="TransitManager.h"/>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Condition="Exists('$(QtMsBuild)\qt.targets')">
