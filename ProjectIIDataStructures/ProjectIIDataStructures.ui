@@ -1,29 +1,447 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<UI version="4.0" >
+<UI version="4.0">
  <class>ProjectIIDataStructuresClass</class>
- <widget class="QMainWindow" name="ProjectIIDataStructuresClass" >
-  <property name="objectName" >
-   <string notr="true">ProjectIIDataStructuresClass</string>
-  </property>
-  <property name="geometry" >
+ <widget class="QMainWindow" name="ProjectIIDataStructuresClass">
+  <property name="geometry">
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>600</width>
-    <height>400</height>
+    <width>1100</width>
+    <height>720</height>
    </rect>
   </property>
-  <property name="windowTitle" >
-   <string>ProjectIIDataStructures</string>
-  </property>  <widget class="QMenuBar" name="menuBar" />
-  <widget class="QToolBar" name="mainToolBar" />
-  <widget class="QWidget" name="centralWidget" />
-  <widget class="QStatusBar" name="statusBar" />
+  <property name="windowTitle">
+   <string>Sistema de transporte La Mancha</string>
+  </property>
+  <widget class="QWidget" name="centralWidget">
+   <layout class="QVBoxLayout" name="verticalLayout">
+    <item>
+     <widget class="QTabWidget" name="mainTabs">
+      <property name="tabPosition">
+       <enum>QTabWidget::North</enum>
+      </property>
+      <property name="tabShape">
+       <enum>QTabWidget::Rounded</enum>
+      </property>
+      <property name="currentIndex">
+       <number>0</number>
+      </property>
+      <widget class="QWidget" name="stationsTab">
+       <attribute name="title">
+        <string>Estaciones</string>
+       </attribute>
+       <layout class="QVBoxLayout" name="verticalLayout_2">
+        <item>
+         <widget class="QGroupBox" name="stationGroup">
+          <property name="title">
+           <string>Administración de estaciones</string>
+          </property>
+          <layout class="QGridLayout" name="gridLayout">
+           <item row="0" column="0">
+            <widget class="QLabel" name="labelStationId">
+             <property name="text">
+              <string>Código</string>
+             </property>
+            </widget>
+           </item>
+           <item row="0" column="1">
+            <widget class="QLineEdit" name="stationIdEdit">
+             <property name="placeholderText">
+              <string>Ingrese el código numérico</string>
+             </property>
+            </widget>
+           </item>
+           <item row="1" column="0">
+            <widget class="QLabel" name="labelStationName">
+             <property name="text">
+              <string>Nombre</string>
+             </property>
+            </widget>
+           </item>
+           <item row="1" column="1">
+            <widget class="QLineEdit" name="stationNameEdit">
+             <property name="placeholderText">
+              <string>Ingrese el nombre de la estación</string>
+             </property>
+            </widget>
+           </item>
+           <item row="0" column="2">
+            <widget class="QPushButton" name="addStationButton">
+             <property name="text">
+              <string>Registrar estación</string>
+             </property>
+            </widget>
+           </item>
+           <item row="1" column="2">
+            <widget class="QPushButton" name="removeStationButton">
+             <property name="text">
+              <string>Eliminar estación</string>
+             </property>
+            </widget>
+           </item>
+          </layout>
+         </widget>
+        </item>
+        <item>
+         <widget class="QTableWidget" name="stationTable">
+          <property name="columnCount">
+           <number>2</number>
+          </property>
+          <property name="alternatingRowColors">
+           <bool>true</bool>
+          </property>
+          <property name="selectionBehavior">
+           <enum>QAbstractItemView::SelectRows</enum>
+          </property>
+          <property name="editTriggers">
+           <set>QAbstractItemView::NoEditTriggers</set>
+          </property>
+          <column>
+           <property name="text">
+            <string>Código</string>
+           </property>
+          </column>
+          <column>
+           <property name="text">
+            <string>Nombre</string>
+           </property>
+          </column>
+         </widget>
+        </item>
+       </layout>
+      </widget>
+      <widget class="QWidget" name="routesTab">
+       <attribute name="title">
+        <string>Rutas</string>
+       </attribute>
+       <layout class="QVBoxLayout" name="verticalLayout_3">
+        <item>
+         <widget class="QGroupBox" name="routesGroup">
+          <property name="title">
+           <string>Configuración de rutas</string>
+          </property>
+          <layout class="QGridLayout" name="gridLayout_2">
+           <item row="0" column="0">
+            <widget class="QLabel" name="labelOrigin">
+             <property name="text">
+              <string>Origen</string>
+             </property>
+            </widget>
+           </item>
+           <item row="0" column="1">
+            <widget class="QComboBox" name="routeOriginCombo"/>
+           </item>
+           <item row="1" column="0">
+            <widget class="QLabel" name="labelDestination">
+             <property name="text">
+              <string>Destino</string>
+             </property>
+            </widget>
+           </item>
+           <item row="1" column="1">
+            <widget class="QComboBox" name="routeDestinationCombo"/>
+           </item>
+           <item row="0" column="2">
+            <widget class="QLabel" name="labelTime">
+             <property name="text">
+              <string>Tiempo (min)</string>
+             </property>
+            </widget>
+           </item>
+           <item row="0" column="3">
+            <widget class="QDoubleSpinBox" name="routeTimeSpin">
+             <property name="minimum">
+              <double>1.000000000000000</double>
+             </property>
+             <property name="maximum">
+              <double>600.000000000000000</double>
+             </property>
+             <property name="singleStep">
+              <double>1.000000000000000</double>
+             </property>
+             <property name="value">
+              <double>10.000000000000000</double>
+             </property>
+            </widget>
+           </item>
+           <item row="0" column="4">
+            <widget class="QPushButton" name="addRouteButton">
+             <property name="text">
+              <string>Agregar ruta</string>
+             </property>
+            </widget>
+           </item>
+           <item row="1" column="4">
+            <widget class="QPushButton" name="removeRouteButton">
+             <property name="text">
+              <string>Eliminar ruta</string>
+             </property>
+            </widget>
+           </item>
+          </layout>
+         </widget>
+        </item>
+        <item>
+         <widget class="QGroupBox" name="closuresGroup">
+          <property name="title">
+           <string>Cierres de vía</string>
+          </property>
+          <layout class="QGridLayout" name="gridLayout_3">
+           <item row="0" column="0">
+            <widget class="QPushButton" name="loadClosuresButton">
+             <property name="text">
+              <string>Cargar cierres</string>
+             </property>
+            </widget>
+           </item>
+           <item row="0" column="1">
+            <widget class="QLabel" name="closuresInfoLabel">
+             <property name="text">
+              <string>No hay cierres cargados</string>
+             </property>
+            </widget>
+           </item>
+           <item row="1" column="0" colspan="2">
+            <widget class="QListWidget" name="closuresList"/>
+           </item>
+          </layout>
+         </widget>
+        </item>
+        <item>
+         <widget class="QTableWidget" name="routeTable">
+          <property name="columnCount">
+           <number>3</number>
+          </property>
+          <property name="alternatingRowColors">
+           <bool>true</bool>
+          </property>
+          <property name="selectionBehavior">
+           <enum>QAbstractItemView::SelectRows</enum>
+          </property>
+          <property name="editTriggers">
+           <set>QAbstractItemView::NoEditTriggers</set>
+          </property>
+          <column>
+           <property name="text">
+            <string>Origen</string>
+           </property>
+          </column>
+          <column>
+           <property name="text">
+            <string>Destino</string>
+           </property>
+          </column>
+          <column>
+           <property name="text">
+            <string>Tiempo (min)</string>
+           </property>
+          </column>
+         </widget>
+        </item>
+       </layout>
+      </widget>
+      <widget class="QWidget" name="algorithmsTab">
+       <attribute name="title">
+        <string>Algoritmos</string>
+       </attribute>
+       <layout class="QGridLayout" name="gridLayout_4">
+        <item row="0" column="0">
+         <widget class="QGroupBox" name="traversalGroup">
+          <property name="title">
+           <string>Recorridos del grafo</string>
+          </property>
+          <layout class="QGridLayout" name="gridLayout_5">
+           <item row="0" column="0">
+            <widget class="QLabel" name="labelTraversal">
+             <property name="text">
+              <string>Algoritmo</string>
+             </property>
+            </widget>
+           </item>
+           <item row="0" column="1">
+            <widget class="QComboBox" name="traversalCombo">
+             <item>
+              <property name="text">
+               <string>BFS</string>
+              </property>
+             </item>
+             <item>
+              <property name="text">
+               <string>DFS</string>
+              </property>
+             </item>
+            </widget>
+           </item>
+           <item row="1" column="0">
+            <widget class="QLabel" name="labelTraversalStart">
+             <property name="text">
+              <string>Estación inicial</string>
+             </property>
+            </widget>
+           </item>
+           <item row="1" column="1">
+            <widget class="QComboBox" name="traversalStartCombo"/>
+           </item>
+           <item row="0" column="2" rowspan="2">
+            <widget class="QPushButton" name="runTraversalButton">
+             <property name="text">
+              <string>Ejecutar recorrido</string>
+             </property>
+            </widget>
+           </item>
+          </layout>
+         </widget>
+        </item>
+        <item row="0" column="1">
+         <widget class="QGroupBox" name="shortestGroup">
+          <property name="title">
+           <string>Rutas más cortas</string>
+          </property>
+          <layout class="QGridLayout" name="gridLayout_6">
+           <item row="0" column="0">
+            <widget class="QLabel" name="labelShortest">
+             <property name="text">
+              <string>Algoritmo</string>
+             </property>
+            </widget>
+           </item>
+           <item row="0" column="1">
+            <widget class="QComboBox" name="shortestCombo">
+             <item>
+              <property name="text">
+               <string>Dijkstra</string>
+              </property>
+             </item>
+             <item>
+              <property name="text">
+               <string>Floyd-Warshall</string>
+              </property>
+             </item>
+            </widget>
+           </item>
+           <item row="1" column="0">
+            <widget class="QLabel" name="labelShortestStart">
+             <property name="text">
+              <string>Origen</string>
+             </property>
+            </widget>
+           </item>
+           <item row="1" column="1">
+            <widget class="QComboBox" name="shortestStartCombo"/>
+           </item>
+           <item row="2" column="0">
+            <widget class="QLabel" name="labelShortestEnd">
+             <property name="text">
+              <string>Destino</string>
+             </property>
+            </widget>
+           </item>
+           <item row="2" column="1">
+            <widget class="QComboBox" name="shortestEndCombo"/>
+           </item>
+           <item row="0" column="2" rowspan="3">
+            <widget class="QPushButton" name="runShortestButton">
+             <property name="text">
+              <string>Calcular ruta</string>
+             </property>
+            </widget>
+           </item>
+          </layout>
+         </widget>
+        </item>
+        <item row="1" column="0">
+         <widget class="QGroupBox" name="mstGroup">
+          <property name="title">
+           <string>Árbol de expansión mínima</string>
+          </property>
+          <layout class="QGridLayout" name="gridLayout_7">
+           <item row="0" column="0">
+            <widget class="QPushButton" name="runPrimButton">
+             <property name="text">
+              <string>Prim</string>
+             </property>
+            </widget>
+           </item>
+           <item row="0" column="1">
+            <widget class="QPushButton" name="runKruskalButton">
+             <property name="text">
+              <string>Kruskal</string>
+             </property>
+            </widget>
+           </item>
+          </layout>
+         </widget>
+        </item>
+        <item row="0" column="2" rowspan="2">
+         <widget class="QTextEdit" name="resultText">
+          <property name="readOnly">
+           <bool>true</bool>
+          </property>
+         </widget>
+        </item>
+       </layout>
+      </widget>
+      <widget class="QWidget" name="reportsTab">
+       <attribute name="title">
+        <string>Reportes</string>
+       </attribute>
+       <layout class="QVBoxLayout" name="verticalLayout_4">
+        <item>
+         <widget class="QGroupBox" name="reportsGroup">
+          <property name="title">
+           <string>Generación de reportes</string>
+          </property>
+          <layout class="QGridLayout" name="gridLayout_8">
+           <item row="0" column="0">
+            <widget class="QPushButton" name="showStationsButton">
+             <property name="text">
+              <string>Ver estaciones ordenadas</string>
+             </property>
+            </widget>
+           </item>
+           <item row="0" column="1">
+            <widget class="QPushButton" name="showRoutesButton">
+             <property name="text">
+              <string>Ver rutas y cierres</string>
+             </property>
+            </widget>
+           </item>
+           <item row="0" column="2">
+            <widget class="QPushButton" name="exportTraversalsButton">
+             <property name="text">
+              <string>Exportar recorridos del árbol</string>
+             </property>
+            </widget>
+           </item>
+           <item row="0" column="3">
+            <widget class="QPushButton" name="saveReportButton">
+             <property name="text">
+              <string>Guardar en reportes.txt</string>
+             </property>
+            </widget>
+           </item>
+          </layout>
+         </widget>
+        </item>
+        <item>
+         <widget class="QTextEdit" name="reportsText">
+          <property name="readOnly">
+           <bool>true</bool>
+          </property>
+         </widget>
+        </item>
+       </layout>
+      </widget>
+     </widget>
+    </item>
+   </layout>
+  </widget>
+  <widget class="QMenuBar" name="menuBar"/>
+  <widget class="QStatusBar" name="statusBar"/>
  </widget>
- <layoutDefault spacing="6" margin="11" />
- <pixmapfunction></pixmapfunction>
+ <layoutdefault spacing="6" margin="11"/>
  <resources>
-   <include location="ProjectIIDataStructures.qrc"/>
+  <include location="ProjectIIDataStructures.qrc"/>
  </resources>
  <connections/>
 </UI>
