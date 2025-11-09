@@ -45,6 +45,7 @@ public:
     TreeDetail kruskal() const;
     double getWeight(int fromId, int toId) const;
     void clear();
+    void scaleStationPositions(double scaleX, double scaleY);
 private:
     std::vector<Station> stationList;
     std::unordered_map<int, int> indexById;

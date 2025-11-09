@@ -77,6 +77,11 @@ int StationTree::size() const
     return nodeCount;
 }
 
+void StationTree::forEach(const std::function<void(Station &)> &callback)
+{
+    forEach(root, callback);
+}
+
 bool StationTree::insert(Node *&node, const Station &station)
 {
     if (!node)
@@ -204,4 +209,15 @@ void StationTree::clear(Node *node)
     clear(node->left);
     clear(node->right);
     delete node;
+}
+
+void StationTree::forEach(Node *node, const std::function<void(Station &)> &callback)
+{
+    if (!node)
+    {
+        return;
+    }
+    callback(node->data);
+    forEach(node->left, callback);
+    forEach(node->right, callback);
 }

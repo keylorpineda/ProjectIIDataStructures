@@ -3,6 +3,7 @@
 #include <QDateTime>
 #include <QStringList>
 #include <algorithm>
+#include <cmath>
 
 TransitManager::TransitManager()
 {
@@ -67,17 +68,31 @@ bool TransitManager::removeStation(int id)
     return true;
 }
 
-bool TransitManager::addRoute(int fromId, int toId, double time)
+bool TransitManager::addRoute(int fromId, int toId, const std::optional<double> &time)
 {
-    if (fromId == toId || time <= 0)
+    if (fromId == toId)
     {
         return false;
     }
-    if (!graph.addConnection(fromId, toId, time))
+    std::optional<double> weight = time;
+    if (!weight.has_value() || weight.value() <= 0.0)
+    {
+        weight = calculateRouteWeightFromCoordinates(fromId, toId);
+    }
+    if (!weight.has_value() || weight.value() <= 0.0)
     {
         return false;
     }
-    dataManager.appendReportLine(QString("%1 Ruta agregada: %2 ⇄ %3 (%4 minutos)").arg(QDateTime::currentDateTime().toString("dd/MM/yyyy hh:mm"), QString::number(fromId), QString::number(toId), QString::number(time, 'f', 2)));
+    double finalWeight = weight.value();
+    if (!graph.addConnection(fromId, toId, finalWeight))
+    {
+        return false;
+    }
+    dataManager.appendReportLine(QString("%1 Ruta agregada: %2 ⇄ %3 (%4 minutos)")
+                                     .arg(QDateTime::currentDateTime().toString("dd/MM/yyyy hh:mm"),
+                                          QString::number(fromId),
+                                          QString::number(toId),
+                                          QString::number(finalWeight, 'f', 2)));
     saveData();
     return true;
 }
@@ -91,6 +106,34 @@ bool TransitManager::removeRoute(int fromId, int toId)
     dataManager.appendReportLine(QString("%1 Ruta eliminada: %2 ⇄ %3").arg(QDateTime::currentDateTime().toString("dd/MM/yyyy hh:mm"), QString::number(fromId), QString::number(toId)));
     saveData();
     return true;
+}
+
+std::optional<double> TransitManager::calculateRouteWeightFromCoordinates(int fromId, int toId) const
+{
+    if (fromId == toId)
+    {
+        return std::nullopt;
+    }
+    Station fromStation;
+    Station toStation;
+    if (!tree.find(fromId, fromStation) || !tree.find(toId, toStation))
+    {
+        return std::nullopt;
+    }
+    if (!fromStation.hasCoordinates() || !toStation.hasCoordinates())
+    {
+        return std::nullopt;
+    }
+    QPointF fromPos = fromStation.getPosition();
+    QPointF toPos = toStation.getPosition();
+    double dx = fromPos.x() - toPos.x();
+    double dy = fromPos.y() - toPos.y();
+    double distance = std::hypot(dx, dy);
+    if (!std::isfinite(distance) || distance <= 0.0)
+    {
+        return std::nullopt;
+    }
+    return distance;
 }
 
 std::vector<Station> TransitManager::getStations() const
@@ -229,4 +272,28 @@ const StationTree &TransitManager::getTree() const
 const GraphNetwork &TransitManager::getGraph() const
 {
     return graph;
+}
+
+void TransitManager::scaleStationPositions(double scaleX, double scaleY)
+{
+    if (!std::isfinite(scaleX) || !std::isfinite(scaleY) || scaleX <= 0.0 || scaleY <= 0.0)
+    {
+        return;
+    }
+    bool modified = false;
+    tree.forEach([&](Station &station) {
+        if (!station.hasCoordinates())
+        {
+            return;
+        }
+        QPointF pos = station.getPosition();
+        station.setPosition(QPointF(pos.x() * scaleX, pos.y() * scaleY));
+        modified = true;
+    });
+    if (!modified)
+    {
+        return;
+    }
+    graph.scaleStationPositions(scaleX, scaleY);
+    saveData();
 }

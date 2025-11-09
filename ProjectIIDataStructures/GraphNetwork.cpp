@@ -447,6 +447,23 @@ void GraphNetwork::clear()
     activeClosures.clear();
 }
 
+void GraphNetwork::scaleStationPositions(double scaleX, double scaleY)
+{
+    if (!std::isfinite(scaleX) || !std::isfinite(scaleY) || scaleX <= 0.0 || scaleY <= 0.0)
+    {
+        return;
+    }
+    for (auto &station : stationList)
+    {
+        if (!station.hasCoordinates())
+        {
+            continue;
+        }
+        QPointF current = station.getPosition();
+        station.setPosition(QPointF(current.x() * scaleX, current.y() * scaleY));
+    }
+}
+
 int GraphNetwork::indexOf(int id) const
 {
     auto it = indexById.find(id);
