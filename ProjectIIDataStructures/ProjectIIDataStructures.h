@@ -4,6 +4,7 @@
 #include "TransitManager.h"
 #include "ui_ProjectIIDataStructures.h"
 #include <QCloseEvent>
+#include <QEvent>
 #include <QGraphicsPixmapItem>
 #include <QGraphicsScene>
 #include <QIntValidator>
@@ -24,6 +25,7 @@ public:
 
 protected:
     void closeEvent(QCloseEvent *event) override;
+    bool eventFilter(QObject *watched, QEvent *event) override;
 
 private:
     Ui::ProjectIIDataStructuresClass ui;
@@ -56,4 +58,5 @@ private:
     bool mapIsActive() const;
     bool pointWithinMap(const QPointF &point) const;
     void promptAddStationAt(const QPointF &scenePos);
+    void handleStationRemovalRequest(int stationId);
 };
