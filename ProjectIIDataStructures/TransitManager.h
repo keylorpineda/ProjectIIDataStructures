@@ -1,6 +1,8 @@
 #pragma once
 
 #include "DataManager.h"
+#include <QPointF>
+#include <optional>
 
 class TransitManager
 {
@@ -8,7 +10,7 @@ public:
     TransitManager();
     void initialize();
     void saveData();
-    bool addStation(int id, const QString &name);
+    bool addStation(int id, const QString &name, const std::optional<QPointF> &position = std::nullopt);
     bool removeStation(int id);
     bool addRoute(int fromId, int toId, double time);
     bool removeRoute(int fromId, int toId);
@@ -16,6 +18,7 @@ public:
     std::vector<GraphEdge> getRoutes() const;
     std::vector<std::pair<int, int>> getClosures() const;
     void reloadClosures();
+    QString dataDirectory() const;
     std::vector<int> runBfs(int startId);
     std::vector<int> runDfs(int startId);
     PathDetail runDijkstra(int startId, int endId);
