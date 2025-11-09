@@ -12,6 +12,7 @@
 #include <QMessageBox>
 #include <QPointF>
 #include <QPainter>
+#include <QPainterPath>
 #include <QPen>
 #include <QRadialGradient>
 #include <QSizeF>
@@ -447,7 +448,9 @@ void ProjectIIDataStructures::refreshGraphVisualization()
         QPointF labelPos = mid + offset - QPointF(textRect.width() / 2.0, textRect.height() / 2.0);
         QRectF bgRect(labelPos - QPointF(6.0, 4.0), textRect.size() + QSizeF(12.0, 8.0));
         QColor backgroundColor = isClosed ? closureLabelBg : edgeLabelBg;
-        auto *labelBackground = graphScene->addRoundedRect(bgRect, 6.0, 6.0, QPen(Qt::NoPen), QBrush(backgroundColor));
+
+        // Use a simple rectangle background (rounded path caused compilation issues on some setups)
+        auto *labelBackground = graphScene->addRect(bgRect, QPen(Qt::NoPen), QBrush(backgroundColor));
         labelBackground->setZValue(0.8);
         weightItem->setDefaultTextColor(isClosed ? QColor(255, 255, 255) : QColor(45, 52, 54));
         weightItem->setPos(labelPos);
