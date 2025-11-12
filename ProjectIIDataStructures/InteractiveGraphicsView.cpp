@@ -18,7 +18,8 @@ InteractiveGraphicsView::InteractiveGraphicsView(QWidget *parent)
       m_minScale(0.25),
       m_maxScale(15.0),
       m_autoFitEnabled(true),
-      m_userAdjusted(false)
+      m_userAdjusted(false),
+      m_preserveContentScale(false)
 {
     setDragMode(QGraphicsView::ScrollHandDrag);
     setTransformationAnchor(QGraphicsView::AnchorUnderMouse);
@@ -47,6 +48,16 @@ bool InteractiveGraphicsView::autoFitEnabled() const
 bool InteractiveGraphicsView::hasUserAdjusted() const
 {
     return m_userAdjusted;
+}
+
+void InteractiveGraphicsView::setPreserveContentScale(bool preserve)
+{
+    m_preserveContentScale = preserve;
+}
+
+bool InteractiveGraphicsView::preserveContentScale() const
+{
+    return m_preserveContentScale;
 }
 
 void InteractiveGraphicsView::setBackgroundImage(const QPixmap &pixmap)
@@ -110,17 +121,20 @@ void InteractiveGraphicsView::resetToFit()
         return;
     }
 
-    qreal scaleX = static_cast<qreal>(viewSize.width()) / target.width();
-    qreal scaleY = static_cast<qreal>(viewSize.height()) / target.height();
-    qreal desiredScale = std::min(scaleX, scaleY);
-
-    if (std::isfinite(desiredScale) && desiredScale < 1.0)
+    if (!m_preserveContentScale)
     {
-        qreal clampedScale = std::clamp(desiredScale, m_minScale, m_maxScale);
-        QTransform transform;
-        transform.scale(clampedScale, clampedScale);
-        setTransform(transform);
-        m_currentScale = clampedScale;
+        qreal scaleX = static_cast<qreal>(viewSize.width()) / target.width();
+        qreal scaleY = static_cast<qreal>(viewSize.height()) / target.height();
+        qreal desiredScale = std::min(scaleX, scaleY);
+
+        if (std::isfinite(desiredScale) && desiredScale < 1.0)
+        {
+            qreal clampedScale = std::clamp(desiredScale, m_minScale, m_maxScale);
+            QTransform transform;
+            transform.scale(clampedScale, clampedScale);
+            setTransform(transform);
+            m_currentScale = clampedScale;
+        }
     }
 
     centerOn(target.center());

@@ -16,6 +16,9 @@ public:
     bool autoFitEnabled() const;
     bool hasUserAdjusted() const;
 
+    void setPreserveContentScale(bool preserve);
+    bool preserveContentScale() const;
+
     void setBackgroundImage(const QPixmap &pixmap);
     void clearBackgroundImage();
 
@@ -45,6 +48,7 @@ private:
     qreal m_maxScale;
     bool m_autoFitEnabled;
     bool m_userAdjusted;
+    bool m_preserveContentScale;
     QRectF m_lastContentRect;
     QPixmap m_customBackground;
 };

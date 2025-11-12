@@ -238,14 +238,16 @@ void ProjectIIDataStructures::setupUiBehavior()
             return;
         }
         QSize scaledSize = loadedMapPixmap.size();
-        QString detail;
+        QString detail = QString(" (%1×%2 px)")
+                              .arg(QString::number(scaledSize.width()),
+                                   QString::number(scaledSize.height()));
         if (scaledSize != originalSize)
         {
-            detail = QString(" (ajustado de %1×%2 px a %3×%4 px)")
-                         .arg(QString::number(originalSize.width()),
-                              QString::number(originalSize.height()),
-                              QString::number(scaledSize.width()),
-                              QString::number(scaledSize.height()));
+            detail = QString(" (%1×%2 px, ajustado desde %3×%4 px)")
+                         .arg(QString::number(scaledSize.width()),
+                              QString::number(scaledSize.height()),
+                              QString::number(originalSize.width()),
+                              QString::number(originalSize.height()));
         }
         displayMessage(QString("Mapa de fondo actualizado y almacenado%1.").arg(detail));
     });
@@ -874,6 +876,7 @@ bool ProjectIIDataStructures::applyMapPixmap(const QPixmap &pixmap, bool forceFi
     loadedMapPixmap = processed;
     mapSceneRect = QRectF(QPointF(0.0, 0.0), QSizeF(processedSize));
     ui.graphView->clearBackgroundImage();
+    ui.graphView->setPreserveContentScale(true);
     refreshGraphVisualization();
     ui.graphView->setContentRect(mapSceneRect, forceFit);
     updateRouteTimeSuggestion();
@@ -886,30 +889,9 @@ QPixmap ProjectIIDataStructures::prepareMapPixmap(const QPixmap &pixmap) const
     {
         return pixmap;
     }
-    // Allow very high-resolution maps to preserve detail while still
-    // protecting against extremely large images that could exhaust memory.
-    constexpr int maxDimension = 8192;
-    if (pixmap.width() <= maxDimension && pixmap.height() <= maxDimension)
-    {
-        return pixmap;
-    }
-
-    double widthRatio = static_cast<double>(maxDimension) / static_cast<double>(pixmap.width());
-    double heightRatio = static_cast<double>(maxDimension) / static_cast<double>(pixmap.height());
-    double scaleFactor = std::min(widthRatio, heightRatio);
-    if (!std::isfinite(scaleFactor) || scaleFactor <= 0.0)
-    {
-        return pixmap;
-    }
-
-    int newWidth = static_cast<int>(std::round(pixmap.width() * scaleFactor));
-    int newHeight = static_cast<int>(std::round(pixmap.height() * scaleFactor));
-    if (newWidth <= 0 || newHeight <= 0)
-    {
-        return pixmap;
-    }
-
-    return pixmap.scaled(newWidth, newHeight, Qt::KeepAspectRatio, Qt::SmoothTransformation);
+    // Preserve the original pixel dimensions so the map keeps its native
+    // resolution and appears crisp inside the scene.
+    return pixmap;
 }
 
 void ProjectIIDataStructures::clearStoredMap()
@@ -928,6 +910,10 @@ void ProjectIIDataStructures::clearStoredMap()
         }
         delete mapPixmapItem;
         mapPixmapItem = nullptr;
+    }
+    if (ui.graphView)
+    {
+        ui.graphView->setPreserveContentScale(false);
     }
     updateRouteTimeSuggestion();
 }
