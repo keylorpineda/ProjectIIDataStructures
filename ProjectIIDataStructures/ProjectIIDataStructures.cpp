@@ -19,6 +19,7 @@
 #include <QLineEdit>
 #include <QMessageBox>
 #include <QGraphicsSceneMouseEvent>
+#include <QPushButton>
 #include <QPointF>
 #include <QPainter>
 #include <QPainterPath>
@@ -877,6 +878,14 @@ bool ProjectIIDataStructures::applyMapPixmap(const QPixmap &pixmap, bool forceFi
     mapSceneRect = QRectF(QPointF(0.0, 0.0), QSizeF(processedSize));
     ui.graphView->clearBackgroundImage();
     ui.graphView->setPreserveContentScale(true);
+    if (ui.zoomInButton)
+    {
+        ui.zoomInButton->setEnabled(false);
+    }
+    if (ui.zoomOutButton)
+    {
+        ui.zoomOutButton->setEnabled(false);
+    }
     refreshGraphVisualization();
     ui.graphView->setContentRect(mapSceneRect, forceFit);
     updateRouteTimeSuggestion();
@@ -914,6 +923,14 @@ void ProjectIIDataStructures::clearStoredMap()
     if (ui.graphView)
     {
         ui.graphView->setPreserveContentScale(false);
+    }
+    if (ui.zoomInButton)
+    {
+        ui.zoomInButton->setEnabled(true);
+    }
+    if (ui.zoomOutButton)
+    {
+        ui.zoomOutButton->setEnabled(true);
     }
     updateRouteTimeSuggestion();
 }

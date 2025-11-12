@@ -52,7 +52,23 @@ bool InteractiveGraphicsView::hasUserAdjusted() const
 
 void InteractiveGraphicsView::setPreserveContentScale(bool preserve)
 {
+    if (m_preserveContentScale == preserve)
+    {
+        return;
+    }
+
     m_preserveContentScale = preserve;
+
+    if (m_preserveContentScale)
+    {
+        resetTransform();
+        m_currentScale = 1.0;
+        m_userAdjusted = false;
+        if (!m_lastContentRect.isNull())
+        {
+            centerOn(m_lastContentRect.center());
+        }
+    }
 }
 
 bool InteractiveGraphicsView::preserveContentScale() const
@@ -121,7 +137,18 @@ void InteractiveGraphicsView::resetToFit()
         return;
     }
 
-    if (!m_preserveContentScale)
+    if (m_preserveContentScale)
+    {
+        centerOn(target.center());
+        m_userAdjusted = false;
+        return;
+    }
+
+    qreal scaleX = static_cast<qreal>(viewSize.width()) / target.width();
+    qreal scaleY = static_cast<qreal>(viewSize.height()) / target.height();
+    qreal desiredScale = std::min(scaleX, scaleY);
+
+    if (std::isfinite(desiredScale) && desiredScale < 1.0)
     {
         qreal scaleX = static_cast<qreal>(viewSize.width()) / target.width();
         qreal scaleY = static_cast<qreal>(viewSize.height()) / target.height();
@@ -159,6 +186,12 @@ void InteractiveGraphicsView::wheelEvent(QWheelEvent *event)
         return;
     }
 
+    if (m_preserveContentScale)
+    {
+        QGraphicsView::wheelEvent(event);
+        return;
+    }
+
     constexpr qreal stepFactor = 1.15;
     qreal factor = event->angleDelta().y() > 0 ? stepFactor : 1.0 / stepFactor;
     zoomBy(factor);
@@ -171,15 +204,31 @@ void InteractiveGraphicsView::keyPressEvent(QKeyEvent *event)
     {
     case Qt::Key_Plus:
     case Qt::Key_Equal:
+        if (m_preserveContentScale)
+        {
+            event->accept();
+            return;
+        }
         zoomBy(1.15);
         event->accept();
         return;
     case Qt::Key_Minus:
     case Qt::Key_Underscore:
+        if (m_preserveContentScale)
+        {
+            event->accept();
+            return;
+        }
         zoomBy(1.0 / 1.15);
         event->accept();
         return;
     case Qt::Key_0:
+        if (m_preserveContentScale)
+        {
+            resetToFit();
+            event->accept();
+            return;
+        }
         resetToFit();
         event->accept();
         return;
@@ -227,6 +276,10 @@ void InteractiveGraphicsView::mouseDoubleClickEvent(QMouseEvent *event)
 
 void InteractiveGraphicsView::zoomBy(qreal factor)
 {
+    if (m_preserveContentScale)
+    {
+        return;
+    }
     qreal newScale = m_currentScale * factor;
     if (newScale < m_minScale)
     {
