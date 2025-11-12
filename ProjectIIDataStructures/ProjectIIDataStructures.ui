@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>1100</width>
-    <height>720</height>
+    <width>1400</width>
+    <height>980</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -217,8 +217,8 @@
            <widget class="InteractiveGraphicsView" name="graphView">
             <property name="minimumSize">
              <size>
-              <width>400</width>
-              <height>300</height>
+              <width>988</width>
+              <height>786</height>
              </size>
             </property>
             <property name="renderHints">

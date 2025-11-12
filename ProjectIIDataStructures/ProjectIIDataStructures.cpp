@@ -549,15 +549,15 @@ void ProjectIIDataStructures::refreshGraphVisualization()
         }
     }
 
-    const double nodeRadius = 24.0;
+    const double nodeRadius = 14.0;
     const QColor nodeFill(52, 152, 219);
     const QColor nodeBorder(19, 33, 60);
     const QColor edgeColor(41, 128, 185);
     const QColor edgeLabelBg(255, 255, 255, 180);
     const QColor closedColor(231, 76, 60);
     const QColor closureLabelBg(231, 76, 60, 110);
-    const QFont edgeFont("Sans Serif", 9, QFont::DemiBold);
-    const QFont nodeFont("Sans Serif", 9, QFont::Bold);
+    const QFont edgeFont("Sans Serif", 8, QFont::DemiBold);
+    const QFont nodeFont("Sans Serif", 8, QFont::DemiBold);
 
     // Draw edges first so that nodes remain on top.
     for (const auto &edge : routes)
@@ -687,18 +687,18 @@ void ProjectIIDataStructures::refreshGraphVisualization()
         QPointF point = positionIt->second;
         QRectF ellipseRect(point.x() - nodeRadius, point.y() - nodeRadius, nodeRadius * 2.0, nodeRadius * 2.0);
 
-        QRectF haloRect = ellipseRect.adjusted(-10.0, -10.0, 10.0, 10.0);
+        QRectF haloRect = ellipseRect.adjusted(-6.0, -6.0, 6.0, 6.0);
         auto *halo = graphScene->addEllipse(haloRect, Qt::NoPen, QBrush(QColor(255, 255, 255, 28)));
         halo->setZValue(1.5);
         halo->setData(kStationItemRole, station.getId());
         halo->setAcceptedMouseButtons(Qt::LeftButton | Qt::RightButton);
 
-        QRadialGradient gradient(point, nodeRadius * 1.25, point);
+        QRadialGradient gradient(point, nodeRadius * 1.35, point);
         gradient.setColorAt(0.0, nodeFill.lighter(125));
         gradient.setColorAt(0.7, nodeFill);
         gradient.setColorAt(1.0, nodeBorder.darker(180));
 
-        auto *node = graphScene->addEllipse(ellipseRect, QPen(nodeBorder, 2.4), QBrush(gradient));
+        auto *node = graphScene->addEllipse(ellipseRect, QPen(nodeBorder, 1.6), QBrush(gradient));
         node->setZValue(2.0);
         node->setData(kStationItemRole, station.getId());
         node->setAcceptedMouseButtons(Qt::LeftButton | Qt::RightButton);
@@ -885,31 +885,27 @@ QPixmap ProjectIIDataStructures::prepareMapPixmap(const QPixmap &pixmap) const
     {
         return pixmap;
     }
-    QSize viewportSize = ui.graphView->viewport()->size();
-    if (viewportSize.isEmpty())
+    constexpr int maxDimension = 4096;
+    if (pixmap.width() <= maxDimension && pixmap.height() <= maxDimension)
     {
         return pixmap;
     }
-    const double marginFactor = 0.92;
-    double maxWidth = std::max(200.0, viewportSize.width() * marginFactor);
-    double maxHeight = std::max(200.0, viewportSize.height() * marginFactor);
-    if (maxWidth <= 0.0 || maxHeight <= 0.0)
-    {
-        return pixmap;
-    }
-    double widthRatio = maxWidth / static_cast<double>(pixmap.width());
-    double heightRatio = maxHeight / static_cast<double>(pixmap.height());
+
+    double widthRatio = static_cast<double>(maxDimension) / static_cast<double>(pixmap.width());
+    double heightRatio = static_cast<double>(maxDimension) / static_cast<double>(pixmap.height());
     double scaleFactor = std::min(widthRatio, heightRatio);
-    if (!std::isfinite(scaleFactor) || scaleFactor <= 0.0 || scaleFactor >= 1.0)
+    if (!std::isfinite(scaleFactor) || scaleFactor <= 0.0)
     {
         return pixmap;
     }
+
     int newWidth = static_cast<int>(std::round(pixmap.width() * scaleFactor));
     int newHeight = static_cast<int>(std::round(pixmap.height() * scaleFactor));
     if (newWidth <= 0 || newHeight <= 0)
     {
         return pixmap;
     }
+
     return pixmap.scaled(newWidth, newHeight, Qt::KeepAspectRatio, Qt::SmoothTransformation);
 }
 
