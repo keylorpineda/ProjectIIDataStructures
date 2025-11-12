@@ -19,6 +19,7 @@
 #include <QLineEdit>
 #include <QMessageBox>
 #include <QGraphicsSceneMouseEvent>
+#include <QPushButton>
 #include <QPointF>
 #include <QPainter>
 #include <QPainterPath>
@@ -238,14 +239,16 @@ void ProjectIIDataStructures::setupUiBehavior()
             return;
         }
         QSize scaledSize = loadedMapPixmap.size();
-        QString detail;
+        QString detail = QString(" (%1×%2 px)")
+                              .arg(QString::number(scaledSize.width()),
+                                   QString::number(scaledSize.height()));
         if (scaledSize != originalSize)
         {
-            detail = QString(" (ajustado de %1×%2 px a %3×%4 px)")
-                         .arg(QString::number(originalSize.width()),
-                              QString::number(originalSize.height()),
-                              QString::number(scaledSize.width()),
-                              QString::number(scaledSize.height()));
+            detail = QString(" (%1×%2 px, ajustado desde %3×%4 px)")
+                         .arg(QString::number(scaledSize.width()),
+                              QString::number(scaledSize.height()),
+                              QString::number(originalSize.width()),
+                              QString::number(originalSize.height()));
         }
         displayMessage(QString("Mapa de fondo actualizado y almacenado%1.").arg(detail));
     });
@@ -886,28 +889,9 @@ QPixmap ProjectIIDataStructures::prepareMapPixmap(const QPixmap &pixmap) const
     {
         return pixmap;
     }
-    constexpr int maxDimension = 4096;
-    if (pixmap.width() <= maxDimension && pixmap.height() <= maxDimension)
-    {
-        return pixmap;
-    }
-
-    double widthRatio = static_cast<double>(maxDimension) / static_cast<double>(pixmap.width());
-    double heightRatio = static_cast<double>(maxDimension) / static_cast<double>(pixmap.height());
-    double scaleFactor = std::min(widthRatio, heightRatio);
-    if (!std::isfinite(scaleFactor) || scaleFactor <= 0.0)
-    {
-        return pixmap;
-    }
-
-    int newWidth = static_cast<int>(std::round(pixmap.width() * scaleFactor));
-    int newHeight = static_cast<int>(std::round(pixmap.height() * scaleFactor));
-    if (newWidth <= 0 || newHeight <= 0)
-    {
-        return pixmap;
-    }
-
-    return pixmap.scaled(newWidth, newHeight, Qt::KeepAspectRatio, Qt::SmoothTransformation);
+    // Preserve the original pixel dimensions so the map keeps its native
+    // resolution and appears crisp inside the scene.
+    return pixmap;
 }
 
 void ProjectIIDataStructures::clearStoredMap()
@@ -940,7 +924,7 @@ void ProjectIIDataStructures::addMapItemToScene()
     mapPixmapItem->setZValue(-1000.0);
     mapPixmapItem->setPos(0.0, 0.0);
     mapPixmapItem->setTransformationMode(Qt::SmoothTransformation);
-    mapPixmapItem->setCacheMode(QGraphicsItem::DeviceCoordinateCache);
+    mapPixmapItem->setCacheMode(QGraphicsItem::ItemCoordinateCache);
 }
 
 bool ProjectIIDataStructures::mapIsActive() const

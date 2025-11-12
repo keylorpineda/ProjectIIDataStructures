@@ -15,8 +15,8 @@
 InteractiveGraphicsView::InteractiveGraphicsView(QWidget *parent)
     : QGraphicsView(parent),
       m_currentScale(1.0),
-      m_minScale(0.25),
-      m_maxScale(5.0),
+      m_minScale(0.1),
+      m_maxScale(25.0),
       m_autoFitEnabled(true),
       m_userAdjusted(false)
 {
@@ -114,13 +114,16 @@ void InteractiveGraphicsView::resetToFit()
     qreal scaleY = static_cast<qreal>(viewSize.height()) / target.height();
     qreal desiredScale = std::min(scaleX, scaleY);
 
-    if (std::isfinite(desiredScale) && desiredScale < 1.0)
+    if (std::isfinite(desiredScale) && desiredScale > 0.0)
     {
-        qreal clampedScale = std::clamp(desiredScale, m_minScale, m_maxScale);
-        QTransform transform;
-        transform.scale(clampedScale, clampedScale);
-        setTransform(transform);
-        m_currentScale = clampedScale;
+        qreal fitScale = std::min(desiredScale, m_maxScale);
+        if (!qFuzzyCompare(fitScale, 1.0))
+        {
+            QTransform transform;
+            transform.scale(fitScale, fitScale);
+            setTransform(transform);
+        }
+        m_currentScale = fitScale;
     }
 
     centerOn(target.center());
@@ -214,10 +217,11 @@ void InteractiveGraphicsView::mouseDoubleClickEvent(QMouseEvent *event)
 void InteractiveGraphicsView::zoomBy(qreal factor)
 {
     qreal newScale = m_currentScale * factor;
-    if (newScale < m_minScale)
+    qreal minAllowed = std::min(m_minScale, m_currentScale);
+    if (newScale < minAllowed)
     {
-        factor = m_minScale / m_currentScale;
-        newScale = m_minScale;
+        factor = minAllowed / m_currentScale;
+        newScale = minAllowed;
     }
     else if (newScale > m_maxScale)
     {
