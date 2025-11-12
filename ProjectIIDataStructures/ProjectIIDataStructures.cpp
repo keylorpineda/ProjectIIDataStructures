@@ -877,6 +877,15 @@ bool ProjectIIDataStructures::applyMapPixmap(const QPixmap &pixmap, bool forceFi
     loadedMapPixmap = processed;
     mapSceneRect = QRectF(QPointF(0.0, 0.0), QSizeF(processedSize));
     ui.graphView->clearBackgroundImage();
+    ui.graphView->setPreserveContentScale(true);
+    if (ui.zoomInButton)
+    {
+        ui.zoomInButton->setEnabled(false);
+    }
+    if (ui.zoomOutButton)
+    {
+        ui.zoomOutButton->setEnabled(false);
+    }
     refreshGraphVisualization();
     ui.graphView->setContentRect(mapSceneRect, forceFit);
     updateRouteTimeSuggestion();
@@ -910,6 +919,18 @@ void ProjectIIDataStructures::clearStoredMap()
         }
         delete mapPixmapItem;
         mapPixmapItem = nullptr;
+    }
+    if (ui.graphView)
+    {
+        ui.graphView->setPreserveContentScale(false);
+    }
+    if (ui.zoomInButton)
+    {
+        ui.zoomInButton->setEnabled(true);
+    }
+    if (ui.zoomOutButton)
+    {
+        ui.zoomOutButton->setEnabled(true);
     }
     updateRouteTimeSuggestion();
 }
