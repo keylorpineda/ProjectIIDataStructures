@@ -886,7 +886,9 @@ QPixmap ProjectIIDataStructures::prepareMapPixmap(const QPixmap &pixmap) const
     {
         return pixmap;
     }
-    constexpr int maxDimension = 4096;
+    // Allow very high-resolution maps to preserve detail while still
+    // protecting against extremely large images that could exhaust memory.
+    constexpr int maxDimension = 8192;
     if (pixmap.width() <= maxDimension && pixmap.height() <= maxDimension)
     {
         return pixmap;
@@ -940,7 +942,7 @@ void ProjectIIDataStructures::addMapItemToScene()
     mapPixmapItem->setZValue(-1000.0);
     mapPixmapItem->setPos(0.0, 0.0);
     mapPixmapItem->setTransformationMode(Qt::SmoothTransformation);
-    mapPixmapItem->setCacheMode(QGraphicsItem::DeviceCoordinateCache);
+    mapPixmapItem->setCacheMode(QGraphicsItem::ItemCoordinateCache);
 }
 
 bool ProjectIIDataStructures::mapIsActive() const

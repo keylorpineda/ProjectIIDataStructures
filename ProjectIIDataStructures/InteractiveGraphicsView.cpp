@@ -16,7 +16,7 @@ InteractiveGraphicsView::InteractiveGraphicsView(QWidget *parent)
     : QGraphicsView(parent),
       m_currentScale(1.0),
       m_minScale(0.25),
-      m_maxScale(5.0),
+      m_maxScale(15.0),
       m_autoFitEnabled(true),
       m_userAdjusted(false)
 {
