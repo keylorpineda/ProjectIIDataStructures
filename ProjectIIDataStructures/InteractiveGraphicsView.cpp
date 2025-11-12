@@ -8,6 +8,9 @@
 #include <QResizeEvent>
 #include <QScrollBar>
 #include <QWheelEvent>
+#include <QTransform>
+#include <algorithm>
+#include <cmath>
 
 InteractiveGraphicsView::InteractiveGraphicsView(QWidget *parent)
     : QGraphicsView(parent),
@@ -86,8 +89,41 @@ void InteractiveGraphicsView::resetToFit()
     {
         return;
     }
-    fitInView(target, Qt::KeepAspectRatio);
-    m_currentScale = transform().m11();
+    if (!viewport())
+    {
+        return;
+    }
+
+    QSize viewSize = viewport()->size();
+    if (viewSize.isEmpty())
+    {
+        return;
+    }
+
+    resetTransform();
+    m_currentScale = 1.0;
+
+    if (target.width() <= 0.0 || target.height() <= 0.0)
+    {
+        centerOn(target.center());
+        m_userAdjusted = false;
+        return;
+    }
+
+    qreal scaleX = static_cast<qreal>(viewSize.width()) / target.width();
+    qreal scaleY = static_cast<qreal>(viewSize.height()) / target.height();
+    qreal desiredScale = std::min(scaleX, scaleY);
+
+    if (std::isfinite(desiredScale) && desiredScale < 1.0)
+    {
+        qreal clampedScale = std::clamp(desiredScale, m_minScale, m_maxScale);
+        QTransform transform;
+        transform.scale(clampedScale, clampedScale);
+        setTransform(transform);
+        m_currentScale = clampedScale;
+    }
+
+    centerOn(target.center());
     m_userAdjusted = false;
 }
 
@@ -211,7 +247,7 @@ void InteractiveGraphicsView::updateBackgroundBrush()
         QSize viewSize = viewport() ? viewport()->size() : QSize();
         if (!viewSize.isEmpty())
         {
-            QPixmap scaled = m_customBackground.scaled(viewSize, Qt::KeepAspectRatioByExpanding, Qt::SmoothTransformation);
+            QPixmap scaled = m_customBackground.scaled(viewSize, Qt::KeepAspectRatio, Qt::SmoothTransformation);
             setBackgroundBrush(QBrush(scaled));
         }
         else
