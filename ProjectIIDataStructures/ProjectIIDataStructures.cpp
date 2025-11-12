@@ -10,6 +10,7 @@
 #include <QGraphicsEllipseItem>
 #include <QGraphicsRectItem>
 #include <QGraphicsPixmapItem>
+#include <QGraphicsItem>
 #include <QGraphicsPathItem>
 #include <QGraphicsTextItem>
 #include <QGraphicsView>
@@ -938,6 +939,8 @@ void ProjectIIDataStructures::addMapItemToScene()
     mapPixmapItem = graphScene->addPixmap(loadedMapPixmap);
     mapPixmapItem->setZValue(-1000.0);
     mapPixmapItem->setPos(0.0, 0.0);
+    mapPixmapItem->setTransformationMode(Qt::SmoothTransformation);
+    mapPixmapItem->setCacheMode(QGraphicsItem::DeviceCoordinateCache);
 }
 
 bool ProjectIIDataStructures::mapIsActive() const
