@@ -150,11 +150,18 @@ void InteractiveGraphicsView::resetToFit()
 
     if (std::isfinite(desiredScale) && desiredScale < 1.0)
     {
-        qreal clampedScale = std::clamp(desiredScale, m_minScale, m_maxScale);
-        QTransform transform;
-        transform.scale(clampedScale, clampedScale);
-        setTransform(transform);
-        m_currentScale = clampedScale;
+        qreal scaleX = static_cast<qreal>(viewSize.width()) / target.width();
+        qreal scaleY = static_cast<qreal>(viewSize.height()) / target.height();
+        qreal desiredScale = std::min(scaleX, scaleY);
+
+        if (std::isfinite(desiredScale) && desiredScale < 1.0)
+        {
+            qreal clampedScale = std::clamp(desiredScale, m_minScale, m_maxScale);
+            QTransform transform;
+            transform.scale(clampedScale, clampedScale);
+            setTransform(transform);
+            m_currentScale = clampedScale;
+        }
     }
 
     centerOn(target.center());
