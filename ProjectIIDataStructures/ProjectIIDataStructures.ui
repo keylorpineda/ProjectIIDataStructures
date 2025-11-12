@@ -208,90 +208,6 @@
         </widget>
        </item>
         <item>
-         <widget class="QGroupBox" name="graphGroup">
-          <property name="title">
-           <string>Mapa de rutas</string>
-          </property>
-          <layout class="QVBoxLayout" name="verticalLayout_5">
-           <item>
-           <widget class="InteractiveGraphicsView" name="graphView">
-            <property name="minimumSize">
-             <size>
-              <width>988</width>
-              <height>786</height>
-             </size>
-            </property>
-            <property name="renderHints">
-             <set>QPainter::Antialiasing|QPainter::SmoothPixmapTransform</set>
-            </property>
-           </widget>
-          </item>
-          <item>
-           <layout class="QHBoxLayout" name="graphControlsLayout">
-            <item>
-             <widget class="QPushButton" name="loadMapButton">
-              <property name="text">
-               <string>Cargar mapa (imagen)</string>
-              </property>
-             </widget>
-            </item>
-            <item>
-             <widget class="QPushButton" name="clearMapButton">
-              <property name="text">
-               <string>Quitar mapa</string>
-              </property>
-             </widget>
-            </item>
-            <item>
-             <widget class="QPushButton" name="zoomInButton">
-              <property name="text">
-               <string>Acercar</string>
-              </property>
-             </widget>
-            </item>
-            <item>
-             <widget class="QPushButton" name="zoomOutButton">
-              <property name="text">
-               <string>Alejar</string>
-              </property>
-             </widget>
-            </item>
-            <item>
-             <widget class="QPushButton" name="resetViewButton">
-              <property name="text">
-               <string>Reiniciar vista</string>
-              </property>
-             </widget>
-            </item>
-            <item>
-             <spacer name="graphControlsSpacer">
-              <property name="orientation">
-               <enum>Qt::Horizontal</enum>
-              </property>
-              <property name="sizeHint" stdset="0">
-               <size>
-                <width>40</width>
-                <height>20</height>
-               </size>
-              </property>
-             </spacer>
-            </item>
-           </layout>
-          </item>
-          <item>
-           <widget class="QLabel" name="graphHintLabel">
-            <property name="text">
-             <string>Usa la rueda del mouse, las teclas +/- o los botones para explorar el mapa. Haz doble clic en una ubicación del mapa para crear una parada nueva. Los nodos representan estaciones y las líneas muestran rutas con su tiempo estimado.</string>
-            </property>
-             <property name="wordWrap">
-              <bool>true</bool>
-             </property>
-            </widget>
-           </item>
-          </layout>
-         </widget>
-        </item>
-        <item>
          <widget class="QTableWidget" name="routeTable">
           <property name="columnCount">
            <number>3</number>
@@ -320,6 +236,97 @@
             <string>Tiempo (min)</string>
            </property>
           </column>
+         </widget>
+        </item>
+      </layout>
+     </widget>
+      <widget class="QWidget" name="mapTab">
+       <attribute name="title">
+        <string>Mapa</string>
+       </attribute>
+       <layout class="QVBoxLayout" name="verticalLayout_6">
+        <item>
+         <widget class="QGroupBox" name="graphGroup">
+          <property name="title">
+           <string>Mapa de rutas</string>
+          </property>
+          <layout class="QVBoxLayout" name="verticalLayout_5">
+           <item>
+            <widget class="InteractiveGraphicsView" name="graphView">
+             <property name="minimumSize">
+              <size>
+               <width>988</width>
+               <height>786</height>
+              </size>
+             </property>
+             <property name="renderHints">
+              <set>QPainter::Antialiasing|QPainter::SmoothPixmapTransform</set>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <layout class="QHBoxLayout" name="graphControlsLayout">
+             <item>
+              <widget class="QPushButton" name="loadMapButton">
+               <property name="text">
+                <string>Cargar mapa (imagen)</string>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QPushButton" name="clearMapButton">
+               <property name="text">
+                <string>Quitar mapa</string>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QPushButton" name="zoomInButton">
+               <property name="text">
+                <string>Acercar</string>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QPushButton" name="zoomOutButton">
+               <property name="text">
+                <string>Alejar</string>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QPushButton" name="resetViewButton">
+               <property name="text">
+                <string>Reiniciar vista</string>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <spacer name="graphControlsSpacer">
+               <property name="orientation">
+                <enum>Qt::Horizontal</enum>
+               </property>
+               <property name="sizeHint" stdset="0">
+                <size>
+                 <width>40</width>
+                 <height>20</height>
+                </size>
+               </property>
+              </spacer>
+             </item>
+            </layout>
+           </item>
+           <item>
+            <widget class="QLabel" name="graphHintLabel">
+             <property name="text">
+              <string>Usa la rueda del mouse, las teclas +/- o los botones para explorar el mapa. Haz doble clic en una ubicación del mapa para crear una parada nueva. Los nodos representan estaciones y las líneas muestran rutas con su tiempo estimado.</string>
+             </property>
+             <property name="wordWrap">
+              <bool>true</bool>
+             </property>
+            </widget>
+           </item>
+          </layout>
          </widget>
         </item>
        </layout>
