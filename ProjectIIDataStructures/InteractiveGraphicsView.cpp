@@ -2,6 +2,7 @@
 
 #include <QBrush>
 #include <QColor>
+#include <QGraphicsItem>
 #include <QKeyEvent>
 #include <QLinearGradient>
 #include <QMouseEvent>
@@ -144,8 +145,17 @@ void InteractiveGraphicsView::resetToFit()
         return;
     }
 
-    qreal scaleX = static_cast<qreal>(viewSize.width()) / target.width();
-    qreal scaleY = static_cast<qreal>(viewSize.height()) / target.height();
+    // Añadir margen extra al rectángulo objetivo para mostrar desde más lejos
+    // Reducir el margen para mostrar el mapa con más zoom (más cerca)
+    QRectF expandedTarget = target.adjusted(
+        -target.width() * 0.08,   // 8% de margen (antes 15%)
+        -target.height() * 0.08,  // 8% de margen
+        target.width() * 0.08,    // 8% de margen
+        target.height() * 0.08    // 8% de margen
+    );
+
+    qreal scaleX = static_cast<qreal>(viewSize.width()) / expandedTarget.width();
+    qreal scaleY = static_cast<qreal>(viewSize.height()) / expandedTarget.height();
     qreal desiredScale = std::min(scaleX, scaleY);
 
     if (std::isfinite(desiredScale) && desiredScale > 0.0)
@@ -265,7 +275,14 @@ void InteractiveGraphicsView::mouseDoubleClickEvent(QMouseEvent *event)
     if (event->button() == Qt::LeftButton)
     {
         QPointF scenePoint = mapToScene(event->pos());
-        emit scenePointActivated(scenePoint);
+        QGraphicsItem *item = scene() ? scene()->itemAt(scenePoint, QTransform()) : nullptr;
+        
+        if (!item || !item->data(1).isValid())
+        {
+            emit scenePointActivated(scenePoint);
+            event->accept();
+            return;
+        }
     }
     QGraphicsView::mouseDoubleClickEvent(event);
 }

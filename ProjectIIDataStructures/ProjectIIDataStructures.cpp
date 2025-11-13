@@ -251,6 +251,10 @@ void ProjectIIDataStructures::setupUiBehavior()
                               QString::number(originalSize.height()));
         }
         displayMessage(QString("Mapa de fondo actualizado y almacenado%1.").arg(detail));
+        
+        // Regenerar rutas automáticas después de cargar un nuevo mapa
+        manager.regenerateAllAutomaticRoutes(3);
+        refreshAll();
     });
     connect(ui.clearMapButton, &QPushButton::clicked, this, [this]() {
         if (!mapIsActive())
@@ -484,7 +488,11 @@ void ProjectIIDataStructures::refreshGraphVisualization()
     {
         if (!hasMap)
         {
-            graphScene->addText("No hay estaciones registradas.");
+            // Mensaje estético con mejor formato
+            auto *noStationsText = graphScene->addText("No hay estaciones registradas.");
+            noStationsText->setDefaultTextColor(QColor(100, 116, 139)); // Color gris moderno
+            QFont messageFont("Segoe UI", 12);
+            noStationsText->setFont(messageFont);
         }
         QRectF rect;
         if (hasMap && !mapSceneRect.isNull())
@@ -553,17 +561,21 @@ void ProjectIIDataStructures::refreshGraphVisualization()
         }
     }
 
-    const double nodeRadius = 14.0;
-    const QColor nodeFill(52, 152, 219);
-    const QColor nodeBorder(19, 33, 60);
-    const QColor edgeColor(41, 128, 185);
-    const QColor edgeLabelBg(255, 255, 255, 180);
-    const QColor closedColor(231, 76, 60);
-    const QColor closureLabelBg(231, 76, 60, 110);
-    const QFont edgeFont("Sans Serif", 8, QFont::DemiBold);
-    const QFont nodeFont("Sans Serif", 8, QFont::DemiBold);
+    // Colores modernos y atractivos - Paleta profesional
+    const double nodeRadius = 18.0; // Nodos un poco más grandes (antes 16.0)
+    const QColor nodeFill(59, 130, 246); // Azul moderno (Blue-500)
+    const QColor nodeHoverFill(96, 165, 250); // Azul más claro para hover
+    const QColor nodeBorder(30, 64, 175); // Azul oscuro (Blue-800)
+    const QColor edgeColor(99, 102, 241); // Índigo moderno (Indigo-500)
+    const QColor edgeLabelBg(255, 255, 255, 230); // Fondo más opaco
+    const QColor closedColor(239, 68, 68); // Rojo moderno (Red-500)
+    const QColor closureLabelBg(239, 68, 68, 140); // Rojo semitransparente
+    
+    // Fuentes mejoradas con mejor legibilidad - texto un poco más grande
+    const QFont edgeFont("Segoe UI", 10, QFont::Bold); // Aumentado de 9 a 10
+    const QFont nodeFont("Segoe UI", 11, QFont::Bold); // Aumentado de 10 a 11
 
-    // Draw edges first so that nodes remain on top.
+    // Dibujar aristas primero con mejor estilo
     for (const auto &edge : routes)
     {
         auto fromIt = positions.find(edge.from);
@@ -577,34 +589,89 @@ void ProjectIIDataStructures::refreshGraphVisualization()
         std::pair<int, int> normalizedPair = {std::min(edge.from, edge.to), std::max(edge.from, edge.to)};
         bool isClosed = closureSet.find(normalizedPair) != closureSet.end();
 
-        QPen pen(isClosed ? closedColor : edgeColor, isClosed ? 3.8 : 2.6);
+        // Líneas más gruesas y con mejor estilo
+        QPen pen(isClosed ? closedColor : edgeColor, isClosed ? 4.5 : 3.5);
         if (isClosed)
         {
             pen.setStyle(Qt::DashLine);
+            pen.setDashPattern({8.0, 4.0}); // Patrón de guiones personalizado
         }
+        pen.setCapStyle(Qt::RoundCap);
+        pen.setJoinStyle(Qt::RoundJoin);
+        
         std::vector<QPointF> pathPoints;
         pathPoints.push_back(fromPoint);
 
         if (hasMap && mapSceneRect.contains(fromPoint) && mapSceneRect.contains(toPoint))
         {
-            QPointF corner1(fromPoint.x(), toPoint.y());
-            QPointF corner2(toPoint.x(), fromPoint.y());
-            bool corner1Valid = mapSceneRect.contains(corner1);
-            bool corner2Valid = mapSceneRect.contains(corner2);
-            if (corner1Valid || corner2Valid)
+            const double streetGridAngle = 0.193; // ~11 grados en radianes (ajustado)
+            const double cosAngle = std::cos(streetGridAngle);
+            const double sinAngle = std::sin(streetGridAngle);
+            
+            QPointF direction = toPoint - fromPoint;
+            double dx = direction.x();
+            double dy = direction.y();
+            
+            double rotatedDx = dx * cosAngle + dy * sinAngle;
+            double rotatedDy = -dx * sinAngle + dy * cosAngle;
+            
+            auto rotateBack = [&](double rotX, double rotY, const QPointF &origin) -> QPointF {
+                double realX = rotX * cosAngle - rotY * sinAngle;
+                double realY = rotX * sinAngle + rotY * cosAngle;
+                return QPointF(origin.x() + realX, origin.y() + realY);
+            };
+            
+            double absRotatedDx = std::abs(rotatedDx);
+            double absRotatedDy = std::abs(rotatedDy);
+            
+            const double alignmentThreshold = 0.15;
+            
+            if (absRotatedDy < absRotatedDx * alignmentThreshold)
             {
-                QPointF chosenCorner;
-                if (corner1Valid && corner2Valid)
+                pathPoints.push_back(toPoint);
+            }
+            else if (absRotatedDx < absRotatedDy * alignmentThreshold)
+            {
+                pathPoints.push_back(toPoint);
+            }
+            else
+            {
+                bool horizontalFirst = absRotatedDx > absRotatedDy;
+                double breakRatio = 0.5;
+                
+                if (absRotatedDx > 200.0 && absRotatedDy > 200.0)
                 {
-                    double length1 = QLineF(fromPoint, corner1).length() + QLineF(corner1, toPoint).length();
-                    double length2 = QLineF(fromPoint, corner2).length() + QLineF(corner2, toPoint).length();
-                    chosenCorner = length1 <= length2 ? corner1 : corner2;
+                    breakRatio = absRotatedDx > absRotatedDy * 1.5 ? 0.4 : 0.6;
+                }
+                
+                if (horizontalFirst)
+                {
+                    double breakX = rotatedDx * breakRatio;
+                    QPointF corner = rotateBack(breakX, 0.0, fromPoint);
+                    if (mapSceneRect.contains(corner))
+                    {
+                        pathPoints.push_back(corner);
+                        QPointF secondCorner = rotateBack(breakX, rotatedDy, fromPoint);
+                        if (mapSceneRect.contains(secondCorner))
+                        {
+                            pathPoints.push_back(secondCorner);
+                        }
+                    }
                 }
                 else
                 {
-                    chosenCorner = corner1Valid ? corner1 : corner2;
+                    double breakY = rotatedDy * breakRatio;
+                    QPointF corner = rotateBack(0.0, breakY, fromPoint);
+                    if (mapSceneRect.contains(corner))
+                    {
+                        pathPoints.push_back(corner);
+                        QPointF secondCorner = rotateBack(rotatedDx, breakY, fromPoint);
+                        if (mapSceneRect.contains(secondCorner))
+                        {
+                            pathPoints.push_back(secondCorner);
+                        }
+                    }
                 }
-                pathPoints.push_back(chosenCorner);
             }
         }
 
@@ -619,6 +686,7 @@ void ProjectIIDataStructures::refreshGraphVisualization()
         auto *pathItem = graphScene->addPath(path, pen);
         pathItem->setZValue(0);
 
+        // Calcular punto medio para la etiqueta
         std::vector<double> segmentLengths;
         segmentLengths.reserve(pathPoints.size() - 1);
         double totalLength = 0.0;
@@ -659,28 +727,40 @@ void ProjectIIDataStructures::refreshGraphVisualization()
         if (length > 0.0)
         {
             QPointF normal(-direction.y() / length, direction.x() / length);
-            double offsetDistance = 18.0;
+            double offsetDistance = 22.0;
             offset = normal * offsetDistance;
         }
-        QString weightText = QString::number(edge.weight, 'f', 1);
+        
+        QString weightText = QString::number(edge.weight, 'f', 1) + " min";
         if (isClosed)
         {
-            weightText.append(" (cerrado)");
+            weightText = "✖ " + QString::number(edge.weight, 'f', 1) + " min";
         }
         auto *weightItem = graphScene->addText(weightText, edgeFont);
         QRectF textRect = weightItem->boundingRect();
         QPointF labelPos = mid + offset - QPointF(textRect.width() / 2.0, textRect.height() / 2.0);
-        QRectF bgRect(labelPos - QPointF(6.0, 4.0), textRect.size() + QSizeF(12.0, 8.0));
+        
+        // Fondo con sombra y bordes redondeados mejorados
+        QRectF bgRect(labelPos - QPointF(8.0, 5.0), textRect.size() + QSizeF(16.0, 10.0));
         QColor backgroundColor = isClosed ? closureLabelBg : edgeLabelBg;
 
-        // Use a simple rectangle background (rounded path caused compilation issues on some setups)
-        auto *labelBackground = graphScene->addRect(bgRect, QPen(Qt::NoPen), QBrush(backgroundColor));
+        QPainterPath labelBgPath;
+        labelBgPath.addRoundedRect(bgRect, 6.0, 6.0);
+        
+        // Sombra sutil para el fondo
+        auto *labelShadow = graphScene->addPath(labelBgPath, QPen(Qt::NoPen), QBrush(QColor(0, 0, 0, 30)));
+        labelShadow->setPos(2.0, 2.0);
+        labelShadow->setZValue(0.7);
+        
+        auto *labelBackground = graphScene->addPath(labelBgPath, QPen(QColor(200, 200, 200, 100), 0.5), QBrush(backgroundColor));
         labelBackground->setZValue(0.8);
-        weightItem->setDefaultTextColor(isClosed ? QColor(255, 255, 255) : QColor(45, 52, 54));
+        
+        weightItem->setDefaultTextColor(isClosed ? QColor(255, 255, 255) : QColor(30, 41, 59));
         weightItem->setPos(labelPos);
         weightItem->setZValue(1.2);
     }
 
+    // Dibujar nodos con efectos mejorados
     for (const auto &station : stations)
     {
         auto positionIt = positions.find(station.getId());
@@ -691,38 +771,76 @@ void ProjectIIDataStructures::refreshGraphVisualization()
         QPointF point = positionIt->second;
         QRectF ellipseRect(point.x() - nodeRadius, point.y() - nodeRadius, nodeRadius * 2.0, nodeRadius * 2.0);
 
-        QRectF haloRect = ellipseRect.adjusted(-6.0, -6.0, 6.0, 6.0);
-        auto *halo = graphScene->addEllipse(haloRect, Qt::NoPen, QBrush(QColor(255, 255, 255, 28)));
+        // Sombra externa del nodo
+        QRectF shadowRect = ellipseRect.adjusted(-3.0, -3.0, 3.0, 3.0);
+        auto *shadow = graphScene->addEllipse(shadowRect, Qt::NoPen, QBrush(QColor(0, 0, 0, 40)));
+        shadow->setPos(3.0, 3.0);
+        shadow->setZValue(1.3);
+
+        // Halo brillante alrededor del nodo
+        QRectF haloRect = ellipseRect.adjusted(-8.0, -8.0, 8.0, 8.0);
+        QRadialGradient haloGradient(point, nodeRadius + 8.0);
+        haloGradient.setColorAt(0.0, QColor(59, 130, 246, 60));
+        haloGradient.setColorAt(0.5, QColor(59, 130, 246, 30));
+        haloGradient.setColorAt(1.0, QColor(59, 130, 246, 0));
+        auto *halo = graphScene->addEllipse(haloRect, Qt::NoPen, QBrush(haloGradient));
         halo->setZValue(1.5);
         halo->setData(kStationItemRole, station.getId());
         halo->setAcceptedMouseButtons(Qt::LeftButton | Qt::RightButton);
+        halo->setToolTip(QString("Estación %1\n%2").arg(station.getId()).arg(station.getName()));
 
-        QRadialGradient gradient(point, nodeRadius * 1.35, point);
-        gradient.setColorAt(0.0, nodeFill.lighter(125));
-        gradient.setColorAt(0.7, nodeFill);
-        gradient.setColorAt(1.0, nodeBorder.darker(180));
+        // Gradiente radial mejorado para el nodo
+        QRadialGradient gradient(point - QPointF(nodeRadius * 0.3, nodeRadius * 0.3), nodeRadius * 1.6);
+        gradient.setColorAt(0.0, nodeFill.lighter(140));
+        gradient.setColorAt(0.4, nodeFill);
+        gradient.setColorAt(0.8, nodeFill.darker(115));
+        gradient.setColorAt(1.0, nodeBorder);
 
-        auto *node = graphScene->addEllipse(ellipseRect, QPen(nodeBorder, 1.6), QBrush(gradient));
+        // Borde más prominente
+        auto *node = graphScene->addEllipse(ellipseRect, QPen(nodeBorder, 2.5), QBrush(gradient));
         node->setZValue(2.0);
         node->setData(kStationItemRole, station.getId());
         node->setAcceptedMouseButtons(Qt::LeftButton | Qt::RightButton);
         node->setCursor(Qt::PointingHandCursor);
+        node->setToolTip(QString("Estación %1\n%2").arg(station.getId()).arg(station.getName()));
 
+        // Etiqueta con mejor contraste y fondo
         QString labelText = QString::number(station.getId()) + "\n" + station.getName();
         auto *textItem = graphScene->addText(labelText, nodeFont);
+        textItem->setTextWidth(textItem->boundingRect().width());
         QRectF textRect = textItem->boundingRect();
-        textItem->setDefaultTextColor(Qt::white);
+        
+        // Fondo semitransparente with borde para el texto
+        QRectF textBgRect = textRect.adjusted(-6.0, -3.0, 6.0, 3.0);
+        textBgRect.moveCenter(QPointF(point.x(), point.y()));
+        
+        QPainterPath textBgPath;
+        textBgPath.addRoundedRect(textBgRect, 5.0, 5.0);
+        
+        // Sombra para el fondo del texto
+        auto *textShadow = graphScene->addPath(textBgPath, QPen(Qt::NoPen), QBrush(QColor(0, 0, 0, 50)));
+        textShadow->setPos(2.0, 2.0);
+        textShadow->setZValue(2.4);
+        
+        auto *textBackground = graphScene->addPath(textBgPath, 
+                                                    QPen(QColor(59, 130, 246, 120), 1.0), 
+                                                    QBrush(QColor(255, 255, 255, 240)));
+        textBackground->setZValue(2.5);
+        
+        textItem->setDefaultTextColor(QColor(15, 23, 42)); // Texto casi negro
         textItem->setPos(point.x() - textRect.width() / 2.0, point.y() - textRect.height() / 2.0);
-        textItem->setZValue(2.5);
+        textItem->setZValue(2.6);
         textItem->setData(kStationItemRole, station.getId());
         textItem->setAcceptedMouseButtons(Qt::LeftButton | Qt::RightButton);
+        textItem->setToolTip(QString("Estación %1\n%2").arg(station.getId()).arg(station.getName()));
     }
 
     QRectF bounding = graphScene->itemsBoundingRect();
     if (hasMap)
     {
         bounding = bounding.united(mapSceneRect);
-        bounding = bounding.adjusted(-10.0, -10.0, 10.0, 10.0);
+        // Agregar más margen alrededor cuando hay mapa
+        bounding = bounding.adjusted(-50.0, -50.0, 50.0, 50.0);
     }
     else
     {
@@ -832,6 +950,9 @@ void ProjectIIDataStructures::loadPersistedMap()
     {
         persistMapPixmap(loadedMapPixmap);
     }
+    
+    // Regenerar rutas automáticas después de cargar el mapa
+    manager.regenerateAllAutomaticRoutes(3);
 }
 
 bool ProjectIIDataStructures::persistMapPixmap(const QPixmap &pixmap)
@@ -875,16 +996,26 @@ bool ProjectIIDataStructures::applyMapPixmap(const QPixmap &pixmap, bool forceFi
         manager.scaleStationPositions(scaleX, scaleY);
     }
     loadedMapPixmap = processed;
-    mapSceneRect = QRectF(QPointF(0.0, 0.0), QSizeF(processedSize));
+    
+    // Expandir el rectángulo de la escena para dar más espacio visual alrededor del mapa
+    // Reducir el margen extra para mayor zoom inicial
+    QRectF baseRect = QRectF(QPointF(0.0, 0.0), QSizeF(processedSize));
+    mapSceneRect = baseRect.adjusted(
+        -processedSize.width() * 0.05,   // 5% de margen extra (antes 10%)
+        -processedSize.height() * 0.05,
+        processedSize.width() * 0.05,
+        processedSize.height() * 0.05
+    );
+    
     ui.graphView->clearBackgroundImage();
-    ui.graphView->setPreserveContentScale(true);
+    ui.graphView->setPreserveContentScale(false); // Permitir zoom
     if (ui.zoomInButton)
     {
-        ui.zoomInButton->setEnabled(false);
+        ui.zoomInButton->setEnabled(true); // Habilitar zoom
     }
     if (ui.zoomOutButton)
     {
-        ui.zoomOutButton->setEnabled(false);
+        ui.zoomOutButton->setEnabled(true); // Habilitar zoom
     }
     refreshGraphVisualization();
     ui.graphView->setContentRect(mapSceneRect, forceFit);
@@ -995,11 +1126,6 @@ void ProjectIIDataStructures::promptAddStationAt(const QPointF &scenePos)
     }
 
     bool ok = false;
-    int id = QInputDialog::getInt(this, tr("Nueva estación"), tr("Código de estación:"), 1, 1, 999999, 1, &ok);
-    if (!ok)
-    {
-        return;
-    }
     QString name = QInputDialog::getText(this, tr("Nueva estación"), tr("Nombre de la estación:"), QLineEdit::Normal, QString(), &ok).trimmed();
     if (!ok)
     {
@@ -1010,14 +1136,17 @@ void ProjectIIDataStructures::promptAddStationAt(const QPointF &scenePos)
         displayError("El nombre de la estación no puede estar vacío.");
         return;
     }
+    
+    int id = manager.getNextAvailableStationId();
+    
     if (manager.addStation(id, name, std::optional<QPointF>(scenePos)))
     {
-        displayMessage("Estación agregada correctamente en el mapa.");
+        displayMessage(QString("Estación %1 - %2 agregada correctamente en el mapa.").arg(id).arg(name));
         refreshAll();
     }
     else
     {
-        displayError("No se pudo registrar la estación. Verifique que el código no exista.");
+        displayError("No se pudo registrar la estación.");
     }
 }
 

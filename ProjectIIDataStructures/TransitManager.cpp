@@ -4,6 +4,7 @@
 #include <QStringList>
 #include <algorithm>
 #include <cmath>
+#include <limits>
 
 TransitManager::TransitManager()
 {
@@ -48,6 +49,13 @@ bool TransitManager::addStation(int id, const QString &name, const std::optional
     }
     dataManager.appendReportLine(QString("%1 Estación agregada: %2 - %3").arg(QDateTime::currentDateTime().toString("dd/MM/yyyy hh:mm"), QString::number(id), trimmedName));
     saveData();
+    
+    // Si la estación tiene coordenadas, generar rutas automáticas a estaciones cercanas
+    if (position.has_value())
+    {
+        generateAutomaticRoutesForStation(id, 3); // Conectar con hasta 3 estaciones cercanas
+    }
+    
     return true;
 }
 
@@ -126,9 +134,12 @@ std::optional<double> TransitManager::calculateRouteWeightFromCoordinates(int fr
     }
     QPointF fromPos = fromStation.getPosition();
     QPointF toPos = toStation.getPosition();
-    double dx = fromPos.x() - toPos.x();
-    double dy = fromPos.y() - toPos.y();
-    double distance = std::hypot(dx, dy);
+    
+    // Usar distancia Manhattan para simular rutas por calles
+    double dx = std::abs(toPos.x() - fromPos.x());
+    double dy = std::abs(toPos.y() - fromPos.y());
+    double distance = dx + dy;
+    
     if (!std::isfinite(distance) || distance <= 0.0)
     {
         return std::nullopt;
@@ -296,4 +307,135 @@ void TransitManager::scaleStationPositions(double scaleX, double scaleY)
     }
     graph.scaleStationPositions(scaleX, scaleY);
     saveData();
+}
+
+int TransitManager::getNextAvailableStationId() const
+{
+    auto stations = tree.inOrder();
+    if (stations.empty())
+    {
+        return 1;
+    }
+    int maxId = 0;
+    for (const auto &station : stations)
+    {
+        if (station.getId() > maxId)
+        {
+            maxId = station.getId();
+        }
+    }
+    return maxId + 1;
+}
+
+void TransitManager::generateAutomaticRoutesForStation(int stationId, int maxConnections)
+{
+    Station targetStation;
+    if (!tree.find(stationId, targetStation))
+    {
+        return;
+    }
+    
+    // Solo generar rutas automáticas si la estación tiene coordenadas
+    if (!targetStation.hasCoordinates())
+    {
+        return;
+    }
+    
+    QPointF targetPos = targetStation.getPosition();
+    auto allStations = tree.inOrder();
+    
+    // Crear lista de estaciones cercanas con sus distancias
+    struct NearbyStation
+    {
+        int id;
+        double distance;
+    };
+    std::vector<NearbyStation> nearbyStations;
+    
+    for (const auto &station : allStations)
+    {
+        if (station.getId() == stationId)
+        {
+            continue; // Saltar la misma estación
+        }
+        
+        if (!station.hasCoordinates())
+        {
+            continue; // Solo conectar con estaciones que tienen coordenadas
+        }
+        
+        QPointF stationPos = station.getPosition();
+        
+        // Calcular distancia Manhattan
+        double dx = std::abs(stationPos.x() - targetPos.x());
+        double dy = std::abs(stationPos.y() - targetPos.y());
+        double distance = dx + dy;
+        
+        if (std::isfinite(distance) && distance > 0.0)
+        {
+            nearbyStations.push_back({station.getId(), distance});
+        }
+    }
+    
+    // Ordenar por distancia (más cercanos primero)
+    std::sort(nearbyStations.begin(), nearbyStations.end(), 
+              [](const NearbyStation &a, const NearbyStation &b) {
+                  return a.distance < b.distance;
+              });
+    
+    // Conectar con las estaciones más cercanas (hasta maxConnections)
+    int connectionsAdded = 0;
+    for (const auto &nearby : nearbyStations)
+    {
+        if (connectionsAdded >= maxConnections)
+        {
+            break;
+        }
+        
+        // Verificar si ya existe una conexión
+        auto existingRoutes = graph.getConnections();
+        bool routeExists = false;
+        for (const auto &route : existingRoutes)
+        {
+            if ((route.from == stationId && route.to == nearby.id) ||
+                (route.from == nearby.id && route.to == stationId))
+            {
+                routeExists = true;
+                break;
+            }
+        }
+        
+        if (!routeExists)
+        {
+            // Crear ruta automática con el peso calculado
+            if (graph.addConnection(stationId, nearby.id, nearby.distance))
+            {
+                dataManager.appendReportLine(
+                    QString("%1 Ruta automática agregada: %2 ⇄ %3 (%4 minutos)")
+                        .arg(QDateTime::currentDateTime().toString("dd/MM/yyyy hh:mm"),
+                             QString::number(stationId),
+                             QString::number(nearby.id),
+                             QString::number(nearby.distance, 'f', 2)));
+                connectionsAdded++;
+            }
+        }
+    }
+    
+    if (connectionsAdded > 0)
+    {
+        saveData();
+    }
+}
+
+void TransitManager::regenerateAllAutomaticRoutes(int maxConnectionsPerStation)
+{
+    auto allStations = tree.inOrder();
+    
+    for (const auto &station : allStations)
+    {
+        if (station.hasCoordinates())
+        {
+            generateAutomaticRoutesForStation(station.getId(), maxConnectionsPerStation);
+        }
+    }
 }

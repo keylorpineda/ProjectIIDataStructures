@@ -61,4 +61,8 @@ private:
     void handleStationRemovalRequest(int stationId);
     QPixmap prepareMapPixmap(const QPixmap &pixmap) const;
     void updateRouteTimeSuggestion();
+    std::vector<QPointF> calculateStreetPath(const QPointF &from, const QPointF &to) const;
+    double calculateManhattanDistance(const QPointF &from, const QPointF &to) const;
+    void autoGenerateRoutesFromProximity();
+    void autoConnectNewStation(int stationId); // NUEVO - conecta una nueva estación
 };

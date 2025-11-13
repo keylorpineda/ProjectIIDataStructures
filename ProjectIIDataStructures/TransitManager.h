@@ -36,6 +36,9 @@ public:
     const GraphNetwork &getGraph() const;
     std::optional<double> calculateRouteWeightFromCoordinates(int fromId, int toId) const;
     void scaleStationPositions(double scaleX, double scaleY);
+    int getNextAvailableStationId() const;
+    void generateAutomaticRoutesForStation(int stationId, int maxConnections = 3);
+    void regenerateAllAutomaticRoutes(int maxConnectionsPerStation = 3);
 private:
     StationTree tree;
     GraphNetwork graph;
